@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Cairn">
+  <title>Cairn</title>
+  <rect width="512" height="512" fill="#faf9f7"/>
+  <g fill="#4c7365">
+    <!-- Five stacked stones, tapering and slightly offset, the way a real cairn sits. -->
+    <rect x="140" y="368" width="232" height="58" rx="26"/>
+    <rect x="158" y="298" width="188" height="54" rx="24" opacity="0.88"/>
+    <rect x="184" y="234" width="146" height="48" rx="22" opacity="0.78"/>
+    <rect x="200" y="178" width="108" height="42" rx="19" opacity="0.68"/>
+    <rect x="220" y="128" width="72" height="34" rx="16" opacity="0.58"/>
+  </g>
+</svg>

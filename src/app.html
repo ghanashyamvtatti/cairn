@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+		<meta
+			name="description"
+			content="A calm, private, local-first task manager. Three projects, one next action each, a board of hard deadlines, and a fifteen-minute weekly reset."
+		/>
+
+		<link rel="icon" href="%sveltekit.assets%/favicon.ico" sizes="32x32" />
+		<link rel="apple-touch-icon" href="%sveltekit.assets%/apple-touch-icon-180x180.png" />
+		<link rel="manifest" href="%sveltekit.assets%/manifest.webmanifest" />
+
+		<meta name="apple-mobile-web-app-capable" content="yes" />
+		<meta name="mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-title" content="Cairn" />
+		<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+		<meta name="theme-color" content="#faf9f7" id="theme-color-meta" />
+
+		<script>
+			/*
+			 * Applies the saved theme before first paint.
+			 *
+			 * This has to be inline and synchronous: reading the preference from IndexedDB
+			 * after hydration would flash a light page at someone who chose dark, which is
+			 * both ugly and, at night, genuinely unpleasant. A tiny localStorage mirror of
+			 * the setting is written whenever it changes; IndexedDB remains the source of
+			 * truth and this is only a paint hint.
+			 */
+			(function () {
+				try {
+					var theme = localStorage.getItem('cairn.theme');
+					var motion = localStorage.getItem('cairn.motion');
+					var root = document.documentElement;
+					if (theme === 'light' || theme === 'dark') root.setAttribute('data-theme', theme);
+					if (motion === 'reduce') root.setAttribute('data-motion', 'reduce');
+
+					var dark =
+						theme === 'dark' ||
+						(theme !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+					var meta = document.querySelector('meta[name="theme-color"]');
+					if (meta) meta.setAttribute('content', dark ? '#161513' : '#faf9f7');
+				} catch (e) {
+					/* Storage can be blocked entirely; the default theme is fine. */
+				}
+			})();
+		</script>
+
+		%sveltekit.head%
+	</head>
+	<body data-sveltekit-preload-data="hover">
+		<div style="display: contents">%sveltekit.body%</div>
+	</body>
+</html>

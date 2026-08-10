@@ -1,0 +1,425 @@
+/*
+ * Cairn design tokens.
+ *
+ * The palette is warm stone rather than the usual cool grey, and there is no red
+ * anywhere in it. Urgency is carried by a muted amber and by typographic weight, never
+ * by alarm colour — an overdue pile rendered in red is the single most reliable way to
+ * turn a missed week into an abandoned app.
+ *
+ * Both themes are defined. `prefers-color-scheme` is the default signal;
+ * `:root[data-theme]` overrides it when the user has chosen explicitly.
+ */
+
+:root {
+	--stone-bg: #faf9f7;
+	--stone-surface: #ffffff;
+	--stone-sunken: #f2f0ec;
+	--stone-border: #e4e0d9;
+	--stone-border-strong: #cdc7bb;
+	--stone-text: #24231f;
+	--stone-text-muted: #6a665d;
+	--stone-text-faint: #948f84;
+	--stone-accent: #4c7365;
+	--stone-accent-text: #3c5c50;
+	--stone-accent-soft: #e7efeb;
+	--stone-attention: #8a5f21;
+	--stone-attention-soft: #f8f0e1;
+	--stone-shadow: 0 1px 2px rgb(36 35 31 / 6%), 0 4px 12px rgb(36 35 31 / 4%);
+	--stone-overlay: rgb(36 35 31 / 32%);
+
+	color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		--stone-bg: #161513;
+		--stone-surface: #1e1d1a;
+		--stone-sunken: #121110;
+		--stone-border: #322f29;
+		--stone-border-strong: #474339;
+		--stone-text: #eae6de;
+		--stone-text-muted: #a39d92;
+		--stone-text-faint: #7a756b;
+		--stone-accent: #8ab8a6;
+		--stone-accent-text: #9cc7b5;
+		--stone-accent-soft: #22302b;
+		--stone-attention: #d9a961;
+		--stone-attention-soft: #2c2418;
+		--stone-shadow: 0 1px 2px rgb(0 0 0 / 40%), 0 4px 12px rgb(0 0 0 / 24%);
+		--stone-overlay: rgb(0 0 0 / 56%);
+
+		color-scheme: dark;
+	}
+}
+
+/* Explicit choice wins over the system signal, in both directions. */
+:root[data-theme='light'] {
+	--stone-bg: #faf9f7;
+	--stone-surface: #ffffff;
+	--stone-sunken: #f2f0ec;
+	--stone-border: #e4e0d9;
+	--stone-border-strong: #cdc7bb;
+	--stone-text: #24231f;
+	--stone-text-muted: #6a665d;
+	--stone-text-faint: #948f84;
+	--stone-accent: #4c7365;
+	--stone-accent-text: #3c5c50;
+	--stone-accent-soft: #e7efeb;
+	--stone-attention: #8a5f21;
+	--stone-attention-soft: #f8f0e1;
+	--stone-shadow: 0 1px 2px rgb(36 35 31 / 6%), 0 4px 12px rgb(36 35 31 / 4%);
+	--stone-overlay: rgb(36 35 31 / 32%);
+
+	color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+	--stone-bg: #161513;
+	--stone-surface: #1e1d1a;
+	--stone-sunken: #121110;
+	--stone-border: #322f29;
+	--stone-border-strong: #474339;
+	--stone-text: #eae6de;
+	--stone-text-muted: #a39d92;
+	--stone-text-faint: #7a756b;
+	--stone-accent: #8ab8a6;
+	--stone-accent-text: #9cc7b5;
+	--stone-accent-soft: #22302b;
+	--stone-attention: #d9a961;
+	--stone-attention-soft: #2c2418;
+	--stone-shadow: 0 1px 2px rgb(0 0 0 / 40%), 0 4px 12px rgb(0 0 0 / 24%);
+	--stone-overlay: rgb(0 0 0 / 56%);
+
+	color-scheme: dark;
+}
+
+:root {
+	--font-sans:
+		ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+		sans-serif;
+	--font-numeric: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+	--text-xs: 0.75rem;
+	--text-sm: 0.8125rem;
+	--text-base: 0.9375rem;
+	--text-md: 1.0625rem;
+	--text-lg: 1.3125rem;
+	--text-xl: 1.75rem;
+
+	--space-1: 0.25rem;
+	--space-2: 0.5rem;
+	--space-3: 0.75rem;
+	--space-4: 1rem;
+	--space-5: 1.5rem;
+	--space-6: 2rem;
+	--space-7: 3rem;
+
+	--radius-sm: 6px;
+	--radius: 10px;
+	--radius-lg: 14px;
+
+	--duration: 150ms;
+	--ease: cubic-bezier(0.2, 0, 0, 1);
+
+	--measure: 34rem;
+	--page-max: 46rem;
+}
+
+/*
+ * WCAG 2.3.3 asks for a way to turn off non-essential animation. Honoured from the
+ * system setting and from the in-app override, which exists because the OS toggle is
+ * buried on some platforms.
+ */
+@media (prefers-reduced-motion: reduce) {
+	:root {
+		--duration: 0.01ms;
+	}
+}
+
+:root[data-motion='reduce'] {
+	--duration: 0.01ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+		scroll-behavior: auto !important;
+	}
+}
+
+:root[data-motion='reduce'] *,
+:root[data-motion='reduce'] *::before,
+:root[data-motion='reduce'] *::after {
+	animation-duration: 0.01ms !important;
+	animation-iteration-count: 1 !important;
+	transition-duration: 0.01ms !important;
+	scroll-behavior: auto !important;
+}
+
+/* --------------------------------------------------------------------------
+ * Base
+ * ------------------------------------------------------------------------ */
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+html {
+	-webkit-text-size-adjust: 100%;
+}
+
+body {
+	margin: 0;
+	background: var(--stone-bg);
+	color: var(--stone-text);
+	font-family: var(--font-sans);
+	font-size: var(--text-base);
+	line-height: 1.55;
+	-webkit-font-smoothing: antialiased;
+	text-rendering: optimizeLegibility;
+	/* Keep content clear of the iOS home indicator when installed. */
+	padding-bottom: env(safe-area-inset-bottom);
+}
+
+h1,
+h2,
+h3,
+h4 {
+	margin: 0;
+	font-weight: 600;
+	line-height: 1.25;
+	letter-spacing: -0.011em;
+}
+
+h1 {
+	font-size: var(--text-xl);
+}
+h2 {
+	font-size: var(--text-lg);
+}
+h3 {
+	font-size: var(--text-md);
+}
+
+p {
+	margin: 0;
+}
+
+a {
+	color: var(--stone-accent-text);
+	text-underline-offset: 0.2em;
+}
+
+:where(button, input, textarea, select) {
+	font: inherit;
+	color: inherit;
+}
+
+/* A single, consistent, always-visible focus treatment. */
+:focus-visible {
+	outline: 2px solid var(--stone-accent);
+	outline-offset: 2px;
+	border-radius: var(--radius-sm);
+}
+
+::selection {
+	background: var(--stone-accent-soft);
+}
+
+.visually-hidden {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+	border: 0;
+}
+
+/* --------------------------------------------------------------------------
+ * Shared primitives
+ * ------------------------------------------------------------------------ */
+
+.card {
+	background: var(--stone-surface);
+	border: 1px solid var(--stone-border);
+	border-radius: var(--radius-lg);
+}
+
+.muted {
+	color: var(--stone-text-muted);
+}
+
+.faint {
+	color: var(--stone-text-faint);
+}
+
+.small {
+	font-size: var(--text-sm);
+}
+
+.stack {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-3);
+}
+
+.row {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+}
+
+.numeric {
+	font-variant-numeric: tabular-nums;
+	font-feature-settings: 'tnum' 1;
+}
+
+/* --------------------------------------------------------------------------
+ * Controls
+ *
+ * Global rather than per-component because buttons and inputs appear in every
+ * route, and Svelte's scoped styles would otherwise mean redefining them a dozen
+ * times. Hit targets are at least 44px on touch — the iOS guideline — which the
+ * padding below satisfies at the default font size.
+ * ------------------------------------------------------------------------ */
+
+.btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: var(--space-2);
+	padding: 0.5rem 0.875rem;
+	min-height: 2.375rem;
+	border-radius: var(--radius);
+	border: 1px solid var(--stone-border-strong);
+	background: var(--stone-surface);
+	color: var(--stone-text);
+	font-size: var(--text-base);
+	font-weight: 500;
+	line-height: 1.2;
+	cursor: pointer;
+	text-decoration: none;
+	transition:
+		background var(--duration) var(--ease),
+		border-color var(--duration) var(--ease);
+}
+
+.btn:hover:not(:disabled) {
+	background: var(--stone-sunken);
+}
+
+.btn:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.btn-primary {
+	background: var(--stone-accent);
+	border-color: var(--stone-accent);
+	color: #fff;
+}
+
+:root[data-theme='dark'] .btn-primary,
+.btn-primary {
+	color: var(--stone-bg);
+}
+
+.btn-primary:hover:not(:disabled) {
+	background: var(--stone-accent-text);
+	border-color: var(--stone-accent-text);
+}
+
+.btn-quiet {
+	border-color: transparent;
+	background: transparent;
+	color: var(--stone-text-muted);
+}
+
+.btn-quiet:hover:not(:disabled) {
+	background: var(--stone-sunken);
+	color: var(--stone-text);
+}
+
+.btn-sm {
+	padding: 0.3125rem 0.625rem;
+	min-height: 2rem;
+	font-size: var(--text-sm);
+}
+
+.btn-danger {
+	color: var(--stone-attention);
+	border-color: var(--stone-attention);
+	background: transparent;
+}
+
+.btn-danger:hover:not(:disabled) {
+	background: var(--stone-attention-soft);
+}
+
+.field {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2);
+}
+
+.field > label {
+	font-size: var(--text-sm);
+	font-weight: 500;
+	color: var(--stone-text-muted);
+}
+
+.input,
+.textarea,
+.select {
+	width: 100%;
+	padding: 0.5rem 0.75rem;
+	min-height: 2.375rem;
+	border-radius: var(--radius);
+	border: 1px solid var(--stone-border-strong);
+	background: var(--stone-surface);
+	color: var(--stone-text);
+	font-size: var(--text-base);
+	/* 16px minimum on touch stops iOS Safari zooming the viewport on focus. */
+}
+
+@media (hover: none) {
+	.input,
+	.textarea,
+	.select {
+		font-size: 1rem;
+	}
+}
+
+.input::placeholder,
+.textarea::placeholder {
+	color: var(--stone-text-faint);
+}
+
+.textarea {
+	min-height: 5rem;
+	resize: vertical;
+	line-height: 1.5;
+}
+
+.select {
+	appearance: none;
+	background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+		linear-gradient(135deg, currentColor 50%, transparent 50%);
+	background-position:
+		calc(100% - 1rem) 50%,
+		calc(100% - 0.7rem) 50%;
+	background-size:
+		5px 5px,
+		5px 5px;
+	background-repeat: no-repeat;
+	padding-right: 2rem;
+}
