@@ -105,6 +105,11 @@ export interface SettingsMap {
 	installNudgeDismissedAt: Timestamp | null;
 	/** When the user last exported a backup, used to nudge gently after a while. */
 	lastExportAt: Timestamp | null;
+	/**
+	 * When the welcome was dismissed or the tour finished. `null` means this person has
+	 * never been shown how any of this works.
+	 */
+	onboardedAt: Timestamp | null;
 }
 
 export type SettingKey = keyof SettingsMap;
@@ -121,5 +126,6 @@ export const DEFAULT_SETTINGS: SettingsMap = {
 	persistGranted: false,
 	persistNudgeDismissedAt: null,
 	installNudgeDismissedAt: null,
-	lastExportAt: null
+	lastExportAt: null,
+	onboardedAt: null
 };

@@ -18,7 +18,7 @@
 	--stone-border-strong: #cdc7bb;
 	--stone-text: #24231f;
 	--stone-text-muted: #6a665d;
-	--stone-text-faint: #948f84;
+	--stone-text-faint: #6f6b61;
 	--stone-accent: #4c7365;
 	--stone-accent-text: #3c5c50;
 	--stone-accent-soft: #e7efeb;
@@ -39,7 +39,7 @@
 		--stone-border-strong: #474339;
 		--stone-text: #eae6de;
 		--stone-text-muted: #a39d92;
-		--stone-text-faint: #7a756b;
+		--stone-text-faint: #99938a;
 		--stone-accent: #8ab8a6;
 		--stone-accent-text: #9cc7b5;
 		--stone-accent-soft: #22302b;
@@ -61,7 +61,7 @@
 	--stone-border-strong: #cdc7bb;
 	--stone-text: #24231f;
 	--stone-text-muted: #6a665d;
-	--stone-text-faint: #948f84;
+	--stone-text-faint: #6f6b61;
 	--stone-accent: #4c7365;
 	--stone-accent-text: #3c5c50;
 	--stone-accent-soft: #e7efeb;
@@ -81,7 +81,7 @@
 	--stone-border-strong: #474339;
 	--stone-text: #eae6de;
 	--stone-text-muted: #a39d92;
-	--stone-text-faint: #7a756b;
+	--stone-text-faint: #99938a;
 	--stone-accent: #8ab8a6;
 	--stone-accent-text: #9cc7b5;
 	--stone-accent-soft: #22302b;
@@ -171,6 +171,22 @@
 
 html {
 	-webkit-text-size-adjust: 100%;
+
+	/*
+	 * Reserve the sticky bands when scrolling something into view.
+	 *
+	 * Without this, tabbing to a control just off-screen scrolls it flush to the viewport
+	 * edge — underneath the sticky header or the mobile tab bar — so the focused element
+	 * is completely hidden. WCAG 2.2 SC 2.4.11 (Focus Not Obscured) asks for exactly this.
+	 */
+	scroll-padding-block: 4.5rem calc(4.5rem + env(safe-area-inset-bottom));
+}
+
+@media (min-width: 48rem) {
+	html {
+		/* No bottom tab bar on wide screens. */
+		scroll-padding-block: 4.5rem 2rem;
+	}
 }
 
 body {

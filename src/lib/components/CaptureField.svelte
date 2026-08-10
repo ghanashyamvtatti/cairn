@@ -118,7 +118,21 @@
 		parsedFor = '';
 
 		input?.focus();
-		await app.repository.captureInboxItem(text, usable?.date ?? undefined);
+
+		try {
+			await app.repository.captureInboxItem(text, usable?.date ?? undefined);
+		} catch {
+			/*
+			 * The field was cleared before the await, so a failed write would otherwise
+			 * destroy the thought entirely — the worst thing a capture tool can do. Put the
+			 * original text back, in front of anything typed since, and say nothing further:
+			 * the repository has already explained what went wrong.
+			 */
+			value = value === '' ? raw : `${raw} ${value}`;
+			input?.focus();
+			return;
+		}
+
 		oncaptured?.(text);
 	}
 </script>

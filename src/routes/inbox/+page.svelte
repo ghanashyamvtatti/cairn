@@ -46,7 +46,7 @@
 {#if !app.ready}
 	<p class="muted">Opening the inbox…</p>
 {:else if justEmptied}
-	<section class="empty card" data-testid="empty-inbox">
+	<section class="empty card" data-testid="empty-inbox" data-tour="inbox-list">
 		<h2>Empty</h2>
 		<p class="muted">
 			Nothing waiting. When something surfaces, press <kbd>c</kbd> anywhere in the app and it lands here.
@@ -62,7 +62,7 @@
 		{app.inbox.length === 1 ? 'item' : 'items'} · tap one to sort it
 	</p>
 
-	<ul class="list card" data-testid="inbox-list">
+	<ul class="list card" data-testid="inbox-list" data-tour="inbox-list">
 		{#each app.inbox as item (item.id)}
 			<InboxItemRow {item} expanded={expandedId === item.id} ontoggle={() => toggle(item.id)} />
 		{/each}

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import '../app.css';
+	import { fireAndForget } from '$lib/stores/actions';
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import CaptureDialog from '$lib/components/CaptureDialog.svelte';
@@ -8,11 +9,37 @@
 	import Nav from '$lib/components/Nav.svelte';
 	import ReloadPrompt from '$lib/components/ReloadPrompt.svelte';
 	import Toasts from '$lib/components/Toasts.svelte';
+	import Tour from '$lib/components/Tour.svelte';
+	import WelcomeDialog from '$lib/components/WelcomeDialog.svelte';
 	import { app } from '$lib/stores/app.svelte';
 	import { platform } from '$lib/stores/platform.svelte';
+	import { tour } from '$lib/stores/tour.svelte';
 	import { SHORTCUTS, ui } from '$lib/stores/ui.svelte';
 
 	let { children } = $props();
+
+	/**
+	 * Shown once, and only to someone who has genuinely never used this.
+	 *
+	 * Gated on `app.ready` so it cannot flash before the setting has been read, and on the
+	 * database being empty as well as the flag being unset — a restored backup belongs to
+	 * someone who already knows what this is.
+	 */
+	let welcomeOpen = $state(false);
+
+	$effect(() => {
+		if (!app.ready) return;
+		if (app.settings.onboardedAt !== null) return;
+		if (!app.isEmpty) return;
+		welcomeOpen = true;
+	});
+
+	// Finishing the tour counts as having been shown around.
+	tour.onfinish = () => {
+		if (app.settings.onboardedAt === null) {
+			fireAndForget(app.repository.setSetting('onboardedAt', Date.now()));
+		}
+	};
 
 	onMount(() => {
 		void app.start();
@@ -95,10 +122,21 @@
 				class="btn btn-sm btn-primary"
 				onclick={() => ui.openCapture()}
 				data-testid="open-capture"
+				data-tour="capture"
 			>
 				<Icon name="plus" size={16} />
 				<span class="capture-label">Capture</span>
 			</button>
+
+			<a
+				href={resolve('/guide')}
+				class="icon-link"
+				aria-label="How Cairn works"
+				title="How Cairn works"
+				data-testid="nav-guide"
+			>
+				<Icon name="info" size={18} />
+			</a>
 
 			<a
 				href={resolve('/settings')}
@@ -146,8 +184,26 @@
 			<dd>{shortcut.description}</dd>
 		{/each}
 	</dl>
+
+	{#snippet footer()}
+		<a href={resolve('/guide')} class="btn btn-sm" onclick={() => (ui.shortcutsOpen = false)}>
+			How Cairn works
+		</a>
+		<button
+			type="button"
+			class="btn btn-sm btn-primary"
+			onclick={() => {
+				ui.shortcutsOpen = false;
+				tour.start();
+			}}
+		>
+			Take the tour
+		</button>
+	{/snippet}
 </Dialog>
 
+<WelcomeDialog bind:open={welcomeOpen} onclose={() => (welcomeOpen = false)} />
+<Tour />
 <Toasts />
 <ReloadPrompt />
 

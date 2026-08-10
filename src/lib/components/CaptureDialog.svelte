@@ -31,12 +31,19 @@
 >
 	<CaptureField focusWhen={open} oncaptured={(text) => (justAdded = [text, ...justAdded])} />
 
+	<!--
+		The region is always present and only its contents change. Creating it at the same
+		moment as its first child means a screen reader has nothing to compare against, so
+		the very first captured thought is never announced — the one confirmation that
+		matters most when the field has just cleared itself.
+	-->
+	<ul class="added" aria-live="polite" data-testid="capture-added">
+		{#each justAdded as text, index (index)}
+			<li>{text}</li>
+		{/each}
+	</ul>
+
 	{#if justAdded.length > 0}
-		<ul class="added" aria-live="polite" data-testid="capture-added">
-			{#each justAdded as text, index (index)}
-				<li>{text}</li>
-			{/each}
-		</ul>
 		<p class="count small faint">
 			{justAdded.length} in the inbox. Sort them later — that is the point.
 		</p>

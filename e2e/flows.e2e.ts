@@ -663,3 +663,213 @@ test.describe('regressions', () => {
 		expect(new Set(weights).size).toBeGreaterThan(1);
 	});
 });
+
+test.describe('onboarding', () => {
+	// These specs need the first-run experience the other specs deliberately skip past.
+	test.beforeEach(async ({ page }) => {
+		await resetApp(page, { keepWelcome: true });
+	});
+
+	test('greets a first-time user and explains what the four places are', async ({ page }) => {
+		const welcome = page.locator('dialog[open]');
+		await expect(welcome).toBeVisible();
+		await expect(welcome).toContainText('Welcome to Cairn');
+		for (const place of ['Projects', 'Manifest', 'Inbox', 'Review']) {
+			await expect(welcome).toContainText(place);
+		}
+	});
+
+	test('does not greet someone who has already been shown around', async ({ page }) => {
+		await page.locator('dialog[open]').getByTestId('welcome-skip').click();
+		await expect(page.locator('dialog[open]')).toHaveCount(0);
+
+		await page.reload();
+		await expect(page.getByRole('heading', { name: 'This week' })).toBeVisible();
+		await expect(page.locator('dialog[open]')).toHaveCount(0);
+	});
+
+	test('the tour walks every surface and highlights real elements', async ({ page }) => {
+		// With the example loaded there is something to point at on every step.
+		await page.locator('dialog[open]').getByTestId('welcome-tour').click();
+
+		const card = page.getByTestId('tour-card');
+		await expect(card).toContainText('Three projects, and no more');
+		await expect(page.getByTestId('project-card')).toHaveCount(3);
+
+		// Each step must land on its own surface before being counted, or this races the
+		// navigation the tour performs between steps.
+		const expected = [
+			'/',
+			'/',
+			'/',
+			'/inbox',
+			'/manifest',
+			'/review',
+			'/review',
+			'/settings'
+		] as const;
+
+		for (const [index, route] of expected.entries()) {
+			await expect(card).toBeVisible();
+			await expect(page).toHaveURL(new RegExp(`${route === '/' ? '/' : route}$`));
+			if (index < expected.length - 1) await page.getByTestId('tour-next').click();
+		}
+
+		// It ends on the last step rather than looping.
+		await expect(page.getByTestId('tour-next')).toHaveText('Done');
+
+		await page.getByTestId('tour-next').click();
+		await expect(page.getByTestId('tour-card')).toHaveCount(0);
+	});
+
+	test('the tour can be left at any point with Escape', async ({ page }) => {
+		await page.locator('dialog[open]').getByTestId('welcome-tour').click();
+		await expect(page.getByTestId('tour-card')).toBeVisible();
+
+		await page.getByTestId('tour-next').click();
+		await page.keyboard.press('Escape');
+
+		await expect(page.getByTestId('tour-card')).toHaveCount(0);
+		await expect(page.getByTestId('tour-scrim')).toHaveCount(0);
+	});
+
+	test('app shortcuts do not fire underneath the tour', async ({ page }) => {
+		await page.locator('dialog[open]').getByTestId('welcome-tour').click();
+		await expect(page.getByTestId('tour-card')).toBeVisible();
+
+		// `c` is the capture shortcut; under the tour it must do nothing at all.
+		await page.keyboard.press('c');
+		await expect(page.locator('dialog[open]')).toHaveCount(0);
+		await expect(page.getByTestId('tour-card')).toBeVisible();
+	});
+
+	test('the example week is a legal board, not hand-crafted state', async ({ page }) => {
+		await page.locator('dialog[open]').getByTestId('welcome-tour').click();
+		await expect(page.getByTestId('project-card')).toHaveCount(3);
+		await page.getByTestId('tour-skip').click();
+
+		const { projects, tasks, fixedDates, inboxItems, weeks } = await readDb(page);
+
+		// Every invariant the app enforces holds for the seeded data.
+		expect(weeks.filter((w) => w.endedAt === null)).toHaveLength(1);
+		expect(fixedDates.length).toBeGreaterThan(0);
+		expect(inboxItems.length).toBeGreaterThan(0);
+		for (const project of projects) {
+			const flagged = tasks.filter((t) => t.projectId === project.id && t.isNextAction);
+			expect(flagged.length).toBeLessThanOrEqual(1);
+			expect(project.nextActionId).toBe(flagged[0]?.id ?? null);
+		}
+		// One project is deliberately stalled, so the tour has a live example of it.
+		expect(projects.filter((p) => p.nextActionId === null)).toHaveLength(1);
+		expect(tasks.every((t) => t.weekId !== null)).toBe(true);
+	});
+
+	test('skipping the welcome leaves the database genuinely empty', async ({ page }) => {
+		await page.locator('dialog[open]').getByTestId('welcome-skip').click();
+
+		const { projects, tasks, fixedDates, inboxItems } = await readDb(page);
+		expect([...projects, ...tasks, ...fixedDates, ...inboxItems]).toHaveLength(0);
+		await expect(page.getByTestId('empty-projects')).toBeVisible();
+	});
+
+	test('the guide is reachable from the header and explains the vocabulary', async ({ page }) => {
+		await page.locator('dialog[open]').getByTestId('welcome-skip').click();
+		await page.getByTestId('nav-guide').click();
+
+		await expect(page.getByRole('heading', { name: 'How Cairn works' })).toBeVisible();
+		// The words the interface uses, defined where someone can find them.
+		for (const term of ['next action', 'stalled', 'park', 'Manifest']) {
+			await expect(page.locator('main')).toContainText(term);
+		}
+		await expect(page.locator('main')).toContainText('Home Screen');
+	});
+
+	test('the guide can start the tour on demand, long after onboarding', async ({ page }) => {
+		await page.locator('dialog[open]').getByTestId('welcome-skip').click();
+		await page.getByTestId('nav-guide').click();
+		await page.getByTestId('guide-tour').click();
+
+		await expect(page.getByTestId('tour-card')).toBeVisible();
+		await expect(page).toHaveURL(/\/$/);
+	});
+});
+
+/**
+ * The repository reports a rejected write and rethrows. These specs force a rejection and
+ * assert that nothing downstream claims success — the failure mode that turned three
+ * separate bugs into silent data loss.
+ */
+test.describe('failed writes never claim success', () => {
+	/** Makes the next N IndexedDB writes of a given kind fail. */
+	async function breakWrites(page: import('@playwright/test').Page, store: string) {
+		await page.evaluate((target) => {
+			const original = IDBObjectStore.prototype.add;
+			IDBObjectStore.prototype.add = function (this: IDBObjectStore, ...args: unknown[]) {
+				if (this.name === target) throw new DOMException('Quota exceeded', 'QuotaExceededError');
+				return (original as (...a: unknown[]) => IDBRequest).apply(this, args);
+			};
+		}, store);
+	}
+
+	test('a capture that cannot be saved puts the text back instead of announcing it', async ({
+		page
+	}) => {
+		await breakWrites(page, 'inboxItems');
+
+		await page.getByTestId('open-capture').click();
+		const dialog = page.locator('dialog[open]');
+		await dialog.getByTestId('capture-input').fill('A thought I must not lose');
+		await dialog.getByTestId('capture-submit').click();
+
+		// Reported, not silently dropped.
+		await expect(page.getByTestId('toasts')).toContainText('Could not save that');
+		// The text is recoverable, and nothing pretends it landed.
+		await expect(dialog.getByTestId('capture-input')).toHaveValue('A thought I must not lose');
+		await expect(dialog.getByTestId('capture-added')).not.toContainText(
+			'A thought I must not lose'
+		);
+
+		const { inboxItems } = await readDb(page);
+		expect(inboxItems).toHaveLength(0);
+	});
+
+	test('a triage whose destination write fails puts the inbox item back', async ({ page }) => {
+		await createProject(page, 'Move the studio');
+		await capture(page, 'Ring three removal firms');
+		await page.getByTestId('nav-inbox').first().click();
+		await page.getByTestId('inbox-item-toggle').click();
+
+		// Tasks are what triage writes; the inbox claim happens first and must be undone.
+		await breakWrites(page, 'tasks');
+		await page.getByTestId('triage-to-project').click();
+
+		await expect(page.getByTestId('toasts')).toContainText('Could not file that');
+		await expect(page.getByTestId('inbox-item')).toContainText('Ring three removal firms');
+
+		const { inboxItems, tasks } = await readDb(page);
+		expect(inboxItems.filter((i) => i.deletedAt === null)).toHaveLength(1);
+		expect(tasks.filter((t) => t.deletedAt === null)).toHaveLength(0);
+	});
+
+	test('a failed export downloads nothing and does not reset the backup reminder', async ({
+		page
+	}) => {
+		await page.getByTestId('nav-settings').click();
+		await expect(page.locator('main')).toContainText('You have not exported a backup yet');
+
+		// Break the read the export depends on.
+		await page.evaluate(() => {
+			IDBObjectStore.prototype.getAll = function () {
+				throw new DOMException('Boom', 'UnknownError');
+			};
+		});
+
+		let downloaded = false;
+		page.on('download', () => (downloaded = true));
+		await page.getByTestId('export').click();
+
+		await expect(page.getByTestId('toasts')).toContainText('Could not build the backup');
+		await expect(page.locator('main')).toContainText('You have not exported a backup yet');
+		expect(downloaded).toBe(false);
+	});
+});

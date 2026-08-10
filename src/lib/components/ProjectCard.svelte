@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { app } from '$lib/stores/app.svelte';
+	import { fireAndForget } from '$lib/stores/actions';
 	import { toasts } from '$lib/stores/toasts.svelte';
 	import type { Project } from '$lib/types';
 	import Dialog from './Dialog.svelte';
@@ -61,7 +62,7 @@
 		toasts.show(`Parked “${project.title}”. It is waiting, not lost.`, {
 			action: {
 				label: 'Unpark',
-				run: () => void app.repository.setProjectStatus(project.id, 'active')
+				run: () => fireAndForget(app.repository.setProjectStatus(project.id, 'active'))
 			}
 		});
 	}
@@ -93,7 +94,7 @@
 				// window to change your mind. The rows are soft-deleted, so the restore is
 				// exact — the project and the tasks the cascade took with it.
 				ms: 12000,
-				action: { label: 'Undo', run: () => void app.repository.restoreProject(id) }
+				action: { label: 'Undo', run: () => fireAndForget(app.repository.restoreProject(id)) }
 			}
 		);
 	}
@@ -101,7 +102,7 @@
 
 <article class="project card" class:stalled data-testid="project-card" data-project-id={project.id}>
 	<header>
-		<h3>{project.title}</h3>
+		<h2>{project.title}</h2>
 		<button
 			type="button"
 			class="more"
@@ -120,7 +121,7 @@
 	</header>
 
 	{#if nextAction}
-		<div class="next" data-testid="next-action">
+		<div class="next" data-testid="next-action" data-tour="next-action">
 			<p class="eyebrow">Next action</p>
 			<TaskRow task={nextAction} prominent />
 		</div>
@@ -130,7 +131,7 @@
 			because the only useful response to "this is stalled" is to decide what moves it,
 			and making that one keystroke away is the entire point.
 		-->
-		<div class="next stalled-prompt" data-testid="stalled">
+		<div class="next stalled-prompt" data-testid="stalled" data-tour="next-action">
 			<p class="eyebrow attention">
 				<Icon name="info" size={14} />
 				Stalled — nothing is moving this yet
@@ -254,7 +255,7 @@
 		gap: var(--space-2);
 	}
 
-	h3 {
+	h2 {
 		font-size: var(--text-base);
 		font-weight: 600;
 		color: var(--stone-text-muted);

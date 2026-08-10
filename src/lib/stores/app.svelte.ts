@@ -214,9 +214,12 @@ const ACTION_NAMES: Record<string, string> = {
  * rejected promise. Without this, the UI simply did nothing and said nothing: the
  * clearest possible way to make someone believe their data is saved when it is not.
  *
- * Errors are reported and then swallowed rather than rethrown, so one failed write
- * cannot take the interface down with it. Callers that need to branch on failure check
- * for an `undefined` result.
+ * The error is reported and then RETHROWN. Swallowing it looked kinder but was much
+ * worse: the caller's next line ran regardless, so a failed capture still announced
+ * itself as saved, a failed restore still said "Backup restored", and a failed export
+ * still downloaded a file — one containing the word "undefined". Rethrowing means the
+ * code after the await simply does not run, which is the only safe default. Callers that
+ * need to clean up catch it themselves.
  */
 function reportWriteFailures(repo: CairnRepository): CairnRepository {
 	return new Proxy(repo, {
@@ -239,12 +242,12 @@ function reportWriteFailures(repo: CairnRepository): CairnRepository {
 					return result instanceof Promise
 						? result.catch((error) => {
 								announce(error);
-								return undefined;
+								throw error;
 							})
 						: result;
 				} catch (error) {
 					announce(error);
-					return undefined;
+					throw error;
 				}
 			};
 		}

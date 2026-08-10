@@ -1,6 +1,7 @@
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
 import { ROUTES, type AppRoute } from '$lib/routes';
+import { tour } from './tour.svelte';
 
 export interface ShortcutDefinition {
 	keys: string;
@@ -14,6 +15,7 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
 	{ keys: 'g then i', description: 'Go to the inbox' },
 	{ keys: 'g then r', description: 'Go to the weekly review' },
 	{ keys: 'g then s', description: 'Go to settings' },
+	{ keys: 'g then ?', description: 'Open the guide' },
 	{ keys: '?', description: 'Show this list' },
 	{ keys: 'Esc', description: 'Close whatever is open' }
 ] as const;
@@ -24,7 +26,8 @@ const GOTO_TARGETS: Record<string, AppRoute> = {
 	m: ROUTES.manifest,
 	i: ROUTES.inbox,
 	r: ROUTES.review,
-	s: ROUTES.settings
+	s: ROUTES.settings,
+	'?': ROUTES.guide
 };
 
 /**
@@ -64,6 +67,8 @@ class UiStore {
 		if (event.defaultPrevented) return;
 		if (event.metaKey || event.ctrlKey || event.altKey) return;
 		if (isTypingTarget(event.target)) return;
+		// The tour has its own keys, and `c` would otherwise open capture on top of it.
+		if (tour.active) return;
 
 		const key = event.key;
 		const now = Date.now();

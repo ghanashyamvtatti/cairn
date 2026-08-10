@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { countdownFor, parseIsoDate, toIsoDate } from '$lib/domain/countdown';
+	import { fireAndForget } from '$lib/stores/actions';
 	import { decideAddProject } from '$lib/domain/wip';
 	import { app } from '$lib/stores/app.svelte';
 	import { toasts } from '$lib/stores/toasts.svelte';
@@ -93,7 +94,7 @@
 		const { id, text } = item;
 		await app.repository.triageInboxItem(id, { kind: 'delete' });
 		toasts.show(`Dropped “${text}”.`, {
-			action: { label: 'Undo', run: () => void app.repository.restoreInboxItem(id) }
+			action: { label: 'Undo', run: () => fireAndForget(app.repository.restoreInboxItem(id)) }
 		});
 	}
 

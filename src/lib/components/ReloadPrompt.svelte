@@ -17,6 +17,17 @@
 		}
 	});
 
+	/**
+	 * Accepts the update and reloads.
+	 *
+	 * `updateServiceWorker(true)` attaches its reload to `controllerchange` from inside
+	 * this tab, so only the tab that agreed reloads itself. Other open tabs keep running
+	 * the build they loaded with and pick the new one up on their next navigation.
+	 */
+	function reloadThisTab() {
+		void updateServiceWorker(true);
+	}
+
 	function dismiss() {
 		needRefresh.set(false);
 	}
@@ -27,13 +38,7 @@
 		<p>A new version of Cairn is ready.</p>
 		<div class="actions">
 			<button type="button" class="btn btn-sm" onclick={dismiss}>Later</button>
-			<button
-				type="button"
-				class="btn btn-sm btn-primary"
-				onclick={() => void updateServiceWorker(true)}
-			>
-				Reload
-			</button>
+			<button type="button" class="btn btn-sm btn-primary" onclick={reloadThisTab}> Reload </button>
 		</div>
 	</div>
 {/if}

@@ -86,7 +86,7 @@
 	<p class="small muted">{progress.done} of {progress.total} done</p>
 </div>
 
-<ol class="steps">
+<ol class="steps" data-tour="review-steps">
 	{#each REVIEW_STEPS as step, index (step.id)}
 		{@const done = progress.completed.includes(step.id)}
 		{@const signal = stepSignal(step.id, app.reviewSignals)}
@@ -123,7 +123,7 @@
 	{/each}
 </ol>
 
-<section class="finish card" class:ready={progress.isComplete}>
+<section class="finish card" class:ready={progress.isComplete} data-tour="new-week">
 	<h2>Start a new week</h2>
 	<p class="muted small">
 		Everything you finished gets filed under the week you are closing. Everything you did not gets

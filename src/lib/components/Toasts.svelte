@@ -9,7 +9,15 @@
 -->
 <div class="toasts" aria-live="polite" aria-atomic="false" data-testid="toasts">
 	{#each toasts.items as toast (toast.id)}
-		<div class="toast" class:attention={toast.tone === 'attention'} role="status">
+		<div
+			class="toast"
+			class:attention={toast.tone === 'attention'}
+			role="status"
+			onmouseenter={() => toasts.hold(toast.id)}
+			onmouseleave={() => toasts.release(toast.id)}
+			onfocusin={() => toasts.hold(toast.id)}
+			onfocusout={() => toasts.release(toast.id)}
+		>
 			<span>{toast.message}</span>
 			{#if toast.action}
 				<button

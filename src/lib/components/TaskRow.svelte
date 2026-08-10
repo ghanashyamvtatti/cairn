@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { app } from '$lib/stores/app.svelte';
+	import { fireAndForget } from '$lib/stores/actions';
 	import { toasts } from '$lib/stores/toasts.svelte';
 	import type { Task } from '$lib/types';
 	import Icon from './Icon.svelte';
@@ -49,7 +50,7 @@
 				label: 'Undo',
 				// Soft deletes make undo a one-line restore rather than a re-creation, which
 				// is why removing something here never needs a confirmation dialog.
-				run: () => void app.repository.restoreTask(id)
+				run: () => fireAndForget(app.repository.restoreTask(id))
 			}
 		});
 	}

@@ -1,17 +1,18 @@
 import type { BackupData, BackupFile } from '$lib/domain/backup';
 import type { WeekResetSummary } from '$lib/domain/week';
-import type {
-	FixedDate,
-	Id,
-	InboxItem,
-	IsoDate,
-	Project,
-	ProjectStatus,
-	ReviewStepId,
-	SettingKey,
-	SettingsMap,
-	Task,
-	Week
+import {
+	DEFAULT_SETTINGS,
+	type FixedDate,
+	type Id,
+	type InboxItem,
+	type IsoDate,
+	type Project,
+	type ProjectStatus,
+	type ReviewStepId,
+	type SettingKey,
+	type SettingsMap,
+	type Task,
+	type Week
 } from '$lib/types';
 
 /**
@@ -51,24 +52,20 @@ export interface Snapshot {
 	settings: SettingsMap;
 }
 
-export const EMPTY_SNAPSHOT: Snapshot & { settings: SettingsMap } = {
+/**
+ * What components render against before the first emission arrives.
+ *
+ * Settings come straight from `DEFAULT_SETTINGS` rather than being restated here — a
+ * second copy silently drifts the moment a setting is added.
+ */
+export const EMPTY_SNAPSHOT: Snapshot = {
 	projects: [],
 	tasks: [],
 	inboxItems: [],
 	fixedDates: [],
 	weeks: [],
 	currentWeek: null,
-	// Replaced with real defaults by the repository on first read; this shape only
-	// exists so components can render before the first emission.
-	settings: {
-		wipLimit: 3,
-		theme: 'system',
-		motion: 'system',
-		persistGranted: false,
-		persistNudgeDismissedAt: null,
-		installNudgeDismissedAt: null,
-		lastExportAt: null
-	}
+	settings: { ...DEFAULT_SETTINGS }
 };
 
 export interface NewTaskInput {

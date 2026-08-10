@@ -29,6 +29,13 @@ overdue items, feel bad, and stop opening the app. Cairn is built so that cannot
 Deliberately absent: collaboration, sub-tasks, tags, time tracking, Kanban boards, AI
 scheduling, calendar sync, and per-task notifications.
 
+## Finding your way in
+
+First run opens a short welcome, and from there you can take a spotlight tour of the four
+screens, load an example week to poke at, or read [the guide](src/routes/guide) — which is
+also always available from the ⓘ in the header, from the `?` shortcut sheet, or by
+pressing `g` then `?`.
+
 ## Running it
 
 ```bash

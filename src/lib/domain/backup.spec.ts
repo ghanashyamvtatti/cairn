@@ -618,7 +618,8 @@ describe('withSettingDefaults', () => {
 			persistGranted: DEFAULT_SETTINGS.persistGranted,
 			persistNudgeDismissedAt: DEFAULT_SETTINGS.persistNudgeDismissedAt,
 			installNudgeDismissedAt: DEFAULT_SETTINGS.installNudgeDismissedAt,
-			lastExportAt: DEFAULT_SETTINGS.lastExportAt
+			lastExportAt: DEFAULT_SETTINGS.lastExportAt,
+			onboardedAt: DEFAULT_SETTINGS.onboardedAt
 		} satisfies SettingsMap);
 	});
 
@@ -632,7 +633,8 @@ describe('withSettingDefaults', () => {
 			persistGranted: false,
 			persistNudgeDismissedAt: null,
 			installNudgeDismissedAt: null,
-			lastExportAt: null
+			lastExportAt: null,
+			onboardedAt: null
 		} satisfies SettingsMap);
 	});
 });

@@ -9,7 +9,7 @@ import { expect, type Page } from '@playwright/test';
  * limit" assertions would be meaningless.
  */
 
-export async function resetApp(page: Page) {
+export async function resetApp(page: Page, options: { keepWelcome?: boolean } = {}) {
 	// Land on the app once so the origin exists, then delete the database and reload so
 	// the store re-opens from scratch.
 	await page.goto('/');
@@ -24,6 +24,22 @@ export async function resetApp(page: Page) {
 	});
 	await page.reload();
 	await expect(page.getByRole('heading', { name: 'This week' })).toBeVisible();
+
+	/*
+	 * An empty database is, by definition, a first run — so the welcome appears and its
+	 * backdrop swallows every click. Specs that are not about onboarding dismiss it;
+	 * the ones that are pass `keepWelcome`.
+	 */
+	// An empty database always produces the welcome, so wait for it rather than probing
+	// with `isVisible()` — that returns false before it has rendered, leaving the backdrop
+	// to swallow every later click and the spec to die on a timeout.
+	const welcome = page.getByTestId('welcome-skip');
+	await expect(welcome).toBeVisible();
+
+	if (!options.keepWelcome) {
+		await welcome.click();
+		await expect(page.locator('dialog[open]')).toHaveCount(0);
+	}
 }
 
 /**

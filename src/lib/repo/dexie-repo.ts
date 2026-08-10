@@ -343,6 +343,18 @@ export class DexieRepository implements CairnRepository {
 
 		if (!item) return;
 
+		try {
+			await this.fileTriagedItem(item, action);
+		} catch (error) {
+			// The claim is only safe because it is reversible. Without this, a destination
+			// write that fails leaves the thought tombstoned and nothing created — it is
+			// simply gone, with no undo anywhere in the UI.
+			await this.db.inboxItems.update(id, { deletedAt: null, updatedAt: this.now() });
+			throw error;
+		}
+	}
+
+	private async fileTriagedItem(item: InboxItem, action: TriageAction): Promise<void> {
 		switch (action.kind) {
 			case 'delete':
 				break;

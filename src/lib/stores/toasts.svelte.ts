@@ -23,6 +23,8 @@ const DEFAULT_MS = 5000;
 class Toaster {
 	items = $state<Toast[]>([]);
 
+	private timers = new Map<string, { handle: ReturnType<typeof setTimeout>; ms: number }>();
+
 	show(message: string, options: { tone?: ToastTone; action?: Toast['action']; ms?: number } = {}) {
 		const toast: Toast = {
 			id: newId(),
@@ -32,14 +34,41 @@ class Toaster {
 		};
 
 		this.items = [...this.items, toast];
-
-		const ms = options.ms ?? DEFAULT_MS;
-		setTimeout(() => this.dismiss(toast.id), ms);
+		this.arm(toast.id, options.ms ?? DEFAULT_MS);
 
 		return toast.id;
 	}
 
+	private arm(id: string, ms: number) {
+		const existing = this.timers.get(id);
+		if (existing) clearTimeout(existing.handle);
+		this.timers.set(id, { handle: setTimeout(() => this.dismiss(id), ms), ms });
+	}
+
+	/**
+	 * Stops the countdown while a toast is hovered or focused.
+	 *
+	 * Undo lives only on the toast, and a five-second window that keeps running while you
+	 * are reaching for it — or tabbing towards it — is not a real undo. WCAG 2.2.1 asks
+	 * for a way to pause a time limit; this is that, without a setting.
+	 */
+	hold(id: string) {
+		const timer = this.timers.get(id);
+		if (!timer) return;
+		clearTimeout(timer.handle);
+	}
+
+	/** Restarts the full window when the pointer or focus leaves. */
+	release(id: string) {
+		const timer = this.timers.get(id);
+		if (!timer) return;
+		this.arm(id, timer.ms);
+	}
+
 	dismiss(id: string) {
+		const timer = this.timers.get(id);
+		if (timer) clearTimeout(timer.handle);
+		this.timers.delete(id);
 		this.items = this.items.filter((t) => t.id !== id);
 	}
 }

@@ -61,6 +61,22 @@ reduce or increase overwhelm?** If it increases it, it is a non-goal.
   backup file keyed `__proto__` will reshape the object.
 - Single-letter shortcuts are only safe because `isTypingTarget` suppresses them in
   fields. Keep that guard.
+- **The repository reports a failed write and then RETHROWS.** Never assume the line
+  after an `await app.repository.*` runs. Swallowing the error was worse than useless:
+  a failed capture still said "saved", a failed restore still said "restored", and a
+  failed export downloaded a file containing the word `undefined`. Use `fireAndForget`
+  only where the toast is the whole response.
+- `clientsClaim: true` is load-bearing. Without it the first page load is uncontrolled
+  and installing then going offline gives a blank app.
+
+## Onboarding
+
+`/guide` is the reference; the spotlight tour in `components/Tour.svelte` is the
+walkthrough; the welcome in `components/WelcomeDialog.svelte` fires once on an empty
+database. Tour steps and the example week are plain data in `domain/tour.ts` and
+`domain/example.ts`, so both are unit-tested without a browser. A tour step whose target
+selector matches nothing degrades to a centred card rather than breaking the sequence —
+keep it that way.
 
 ## Invariants worth protecting
 

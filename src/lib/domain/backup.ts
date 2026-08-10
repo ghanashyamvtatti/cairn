@@ -246,7 +246,8 @@ function readSettings(raw: unknown): Partial<SettingsMap> {
 	for (const key of [
 		'persistNudgeDismissedAt',
 		'installNudgeDismissedAt',
-		'lastExportAt'
+		'lastExportAt',
+		'onboardedAt'
 	] as const) {
 		if (raw[key] !== undefined) assign(key, nullableNum(raw[key]));
 	}

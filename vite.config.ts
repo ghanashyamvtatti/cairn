@@ -57,6 +57,12 @@ export default defineConfig({
 				// Belt and braces alongside `includeVersionFile: false`.
 				globIgnores: ['server/**', '**/version.json'],
 				cleanupOutdatedCaches: true,
+				/*
+				 * Required, and load-bearing: without it the first page load is not controlled
+				 * by the service worker at all, so installing and immediately going offline
+				 * gives a blank app. Turning it off to keep other tabs from reloading on an
+				 * update trades a verified offline guarantee for an unverified annoyance.
+				 */
 				clientsClaim: true,
 				runtimeCaching: [
 					{

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { decideAddProject } from '$lib/domain/wip';
+	import { fireAndForget } from '$lib/stores/actions';
 	import { app } from '$lib/stores/app.svelte';
 	import { toasts } from '$lib/stores/toasts.svelte';
 	import Dialog from './Dialog.svelte';
@@ -31,7 +32,10 @@
 	async function park(id: string, name: string) {
 		await app.repository.setProjectStatus(id, 'parked');
 		toasts.show(`Parked “${name}”.`, {
-			action: { label: 'Undo', run: () => void app.repository.setProjectStatus(id, 'active') }
+			action: {
+				label: 'Undo',
+				run: () => fireAndForget(app.repository.setProjectStatus(id, 'active'))
+			}
 		});
 	}
 

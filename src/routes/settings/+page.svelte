@@ -45,6 +45,9 @@
 	);
 
 	async function exportBackup() {
+		// If building the backup throws, nothing below runs — which is the point. Writing
+		// a file and stamping "last backed up" for a backup that does not exist is worse
+		// than no backup at all, because it stops the reminder from ever asking again.
 		const file = await app.repository.exportAll();
 		downloadText(backupFilename(Date.now()), serializeBackup(file));
 		await app.repository.setSetting('lastExportAt', Date.now());
@@ -123,10 +126,27 @@
 	}
 
 	async function clearEverything() {
+		/*
+		 * Deletes content, keeps preferences.
+		 *
+		 * "Delete all data" means the projects, tasks, dates and inbox items named in the
+		 * confirmation — not the theme you chose or the fact that you already know what
+		 * this app is. Wiping the settings table too used to reset both, which threw the
+		 * first-run welcome back in the face of someone who had just deliberately cleared
+		 * their own board.
+		 */
+		const { theme, motion, wipLimit, onboardedAt, lastExportAt } = app.settings;
+
 		await app.repository.clearAll();
+		await app.repository.setSetting('theme', theme);
+		await app.repository.setSetting('motion', motion);
+		await app.repository.setSetting('wipLimit', wipLimit);
+		await app.repository.setSetting('onboardedAt', onboardedAt ?? Date.now());
+		await app.repository.setSetting('lastExportAt', lastExportAt);
 		await app.repository.ensureCurrentWeek();
+
 		confirmClearOpen = false;
-		toasts.show('Everything deleted.');
+		toasts.show('Everything deleted. Your preferences are untouched.');
 	}
 </script>
 
@@ -138,7 +158,7 @@
 	<h1>Settings</h1>
 </header>
 
-<section class="card block">
+<section class="card block" data-tour="backup">
 	<h2>Your data</h2>
 	<p class="muted small">
 		Everything lives in this browser. There is no account, no server, and nothing is sent anywhere.
@@ -357,7 +377,9 @@
 	onclose={() => (confirmClearOpen = false)}
 >
 	<p>Every project, task, date and inbox item in this browser will be removed.</p>
-	<p class="small muted">This cannot be undone, and there is no copy anywhere else.</p>
+	<p class="small muted">
+		Your settings stay as they are. This cannot be undone, and there is no copy anywhere else.
+	</p>
 
 	{#snippet footer()}
 		<button type="button" class="btn" onclick={() => (confirmClearOpen = false)}>Cancel</button>
@@ -486,6 +508,14 @@
 
 	.segment:hover {
 		background: var(--stone-sunken);
+	}
+
+	/*
+	 * The group clips its corners with overflow: hidden, which also clipped away the
+	 * focus ring. Draw it inside the button rather than dropping the rounded corners.
+	 */
+	.segment:focus-visible {
+		outline-offset: -3px;
 	}
 
 	.segment.selected {

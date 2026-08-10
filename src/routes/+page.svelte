@@ -68,7 +68,7 @@
 	{#if !app.ready}
 		<p class="muted" data-testid="loading">Opening your cairn…</p>
 	{:else if app.active.length === 0 && !showParked}
-		<section class="empty card" data-testid="empty-projects">
+		<section class="empty card" data-testid="empty-projects" data-tour="projects">
 			<h2>Nothing is running yet</h2>
 			<p class="muted">
 				A project is an outcome that takes more than one step. Three at a time is the default,
@@ -93,7 +93,7 @@
 			</div>
 		</section>
 	{:else}
-		<div class="projects">
+		<div class="projects" data-tour="projects">
 			{#each app.active as project (project.id)}
 				<ProjectCard {project} />
 			{/each}

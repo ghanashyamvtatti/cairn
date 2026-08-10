@@ -13,6 +13,7 @@
 
 <script lang="ts">
 	import { countdownFor, parseIsoDate } from '$lib/domain/countdown';
+	import { fireAndForget } from '$lib/stores/actions';
 	import { app } from '$lib/stores/app.svelte';
 	import { toasts } from '$lib/stores/toasts.svelte';
 	import type { FixedDate } from '$lib/types';
@@ -70,7 +71,7 @@
 		await app.repository.deleteFixedDate(id);
 		editOpen = false;
 		toasts.show(`Removed “${title}”.`, {
-			action: { label: 'Undo', run: () => void app.repository.restoreFixedDate(id) }
+			action: { label: 'Undo', run: () => fireAndForget(app.repository.restoreFixedDate(id)) }
 		});
 	}
 </script>

@@ -11,7 +11,8 @@ export const ROUTES = {
 	manifest: '/manifest',
 	inbox: '/inbox',
 	review: '/review',
-	settings: '/settings'
+	settings: '/settings',
+	guide: '/guide'
 } as const;
 
 export type AppRoute = (typeof ROUTES)[keyof typeof ROUTES];

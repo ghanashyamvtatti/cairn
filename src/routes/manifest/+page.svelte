@@ -116,7 +116,7 @@
 {#if !app.ready}
 	<p class="muted">Reading the board…</p>
 {:else if app.fixedDates.length === 0}
-	<section class="empty card" data-testid="empty-manifest">
+	<section class="empty card" data-testid="empty-manifest" data-tour="manifest-board">
 		<h2>The board is clear</h2>
 		<p class="muted">
 			Put the immovable things here — renewals, flights, birthdays, filing deadlines. Seeing them
@@ -125,7 +125,7 @@
 	</section>
 {:else}
 	{#if app.manifest.upcoming.length > 0}
-		<ul class="board card" data-testid="manifest-upcoming">
+		<ul class="board card" data-testid="manifest-upcoming" data-tour="manifest-board">
 			{#each app.manifest.upcoming as entry (entry.id)}
 				<ManifestRow {entry} />
 			{/each}
