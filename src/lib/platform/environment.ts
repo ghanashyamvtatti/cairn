@@ -22,14 +22,23 @@ export function isStandalone(): boolean {
 }
 
 /**
- * iOS or iPadOS. iPadOS reports itself as a Mac, so the touch-point check is required —
- * a real Mac reports `maxTouchPoints` of 0.
+ * iOS or iPadOS.
+ *
+ * iPadOS 13+ reports a desktop Mac user agent, so the only reliable signal is
+ * "claims to be a Mac, but has a touchscreen" — a real Mac reports `maxTouchPoints` of 0.
+ * The engine check matters: desktop Chrome with device emulation switched on also reports
+ * `MacIntel` with touch points, and this predicate gates a warning that says the
+ * browser will delete your data in seven days. That is worth being right about, and every
+ * browser on iOS is WebKit underneath.
  */
 export function isIos(): boolean {
 	if (!isBrowser()) return false;
 	const ua = navigator.userAgent;
 	if (/iPad|iPhone|iPod/.test(ua)) return true;
-	return navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+
+	const looksLikeATouchMac = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+	const isWebKit = /Safari/.test(ua) && !/Chrome|Chromium|Edg|OPR/.test(ua);
+	return looksLikeATouchMac && isWebKit;
 }
 
 export type PersistenceState = 'persisted' | 'transient' | 'unsupported';
