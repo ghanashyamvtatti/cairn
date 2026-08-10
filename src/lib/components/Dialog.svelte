@@ -14,7 +14,6 @@
 		title: string;
 		/** Description read out with the title; also rendered when provided. */
 		description?: string;
-		labelledBy?: string;
 		onclose: () => void;
 		children: Snippet;
 		footer?: Snippet;

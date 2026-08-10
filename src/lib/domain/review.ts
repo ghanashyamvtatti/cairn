@@ -1,3 +1,4 @@
+import type { AppRoute } from '$lib/routes';
 import type { ReviewStepId, Week } from '$lib/types';
 
 /**
@@ -15,7 +16,7 @@ export interface ReviewStep {
 	/** One line explaining what "done" looks like. */
 	hint: string;
 	/** Where the work for this step actually happens. */
-	href: string;
+	href: AppRoute;
 	cta: string;
 	/** Rough guidance so the whole ritual reads as ~15 minutes. */
 	minutes: number;

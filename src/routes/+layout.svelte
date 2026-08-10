@@ -1,6 +1,7 @@
 <script lang="ts">
 	import '../app.css';
 	import { onMount } from 'svelte';
+	import { resolve } from '$app/paths';
 	import CaptureDialog from '$lib/components/CaptureDialog.svelte';
 	import Dialog from '$lib/components/Dialog.svelte';
 	import Icon from '$lib/components/Icon.svelte';
@@ -58,7 +59,7 @@
 
 <div class="shell">
 	<header class="topbar">
-		<a href="/" class="brand" aria-label="Cairn, home">
+		<a href={resolve('/')} class="brand" aria-label="Cairn, home">
 			<Icon name="cairn" size={22} />
 			<span>Cairn</span>
 		</a>
@@ -69,7 +70,11 @@
 
 		<div class="actions">
 			{#if !platform.online}
-				<span class="offline" title="You are offline. Everything still works." data-testid="offline">
+				<span
+					class="offline"
+					title="You are offline. Everything still works."
+					data-testid="offline"
+				>
 					<Icon name="offline" size={16} />
 					<span class="offline-label">Offline</span>
 				</span>
@@ -85,7 +90,12 @@
 				<span class="capture-label">Capture</span>
 			</button>
 
-			<a href="/settings" class="icon-link" aria-label="Settings" data-testid="nav-settings">
+			<a
+				href={resolve('/settings')}
+				class="icon-link"
+				aria-label="Settings"
+				data-testid="nav-settings"
+			>
 				<Icon name="settings" size={18} />
 			</a>
 		</div>
@@ -98,8 +108,8 @@
 				<div>
 					<p>{app.error}</p>
 					<p class="small muted">
-						Nothing has been lost from any device where Cairn already works. If you have a
-						backup file, you can restore it from Settings once storage is available.
+						Nothing has been lost from any device where Cairn already works. If you have a backup
+						file, you can restore it from Settings once storage is available.
 					</p>
 				</div>
 			</div>

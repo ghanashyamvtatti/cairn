@@ -11,6 +11,10 @@ function isLive<T extends { deletedAt: number | null }>(row: T): boolean {
 }
 
 function msUntilNextLocalMidnight(from: number): number {
+	// A throwaway value used once to find the next local midnight. SvelteDate exists to
+	// make a Date *reactive*; making this one reactive would create a dependency on a
+	// value that is discarded on the next line.
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity
 	const next = new Date(from);
 	next.setHours(24, 0, 0, 0);
 	// Clamp: a DST spring-forward can make this slightly under a day, and a clock

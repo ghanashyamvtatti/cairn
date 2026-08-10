@@ -137,11 +137,20 @@ export interface CairnRepository {
 	completeTask(id: Id): Promise<void>;
 	reopenTask(id: Id): Promise<void>;
 	deleteTask(id: Id): Promise<void>;
+	/**
+	 * Reverses a soft delete.
+	 *
+	 * This is what makes "Undo" on a toast viable, and why removing something never
+	 * needs a confirmation dialog: a dialog you must dismiss is friction on every
+	 * action, whereas an undo you can ignore costs nothing.
+	 */
+	restoreTask(id: Id): Promise<void>;
 
 	// -- inbox ---------------------------------------------------------------
 	captureInboxItem(text: string, parsedDate?: IsoDate): Promise<InboxItem>;
 	updateInboxItem(id: Id, text: string): Promise<void>;
 	deleteInboxItem(id: Id): Promise<void>;
+	restoreInboxItem(id: Id): Promise<void>;
 	triageInboxItem(id: Id, action: TriageAction): Promise<void>;
 
 	// -- manifest ------------------------------------------------------------
@@ -151,6 +160,7 @@ export interface CairnRepository {
 		patch: Partial<Pick<FixedDate, 'title' | 'date' | 'note'>>
 	): Promise<void>;
 	deleteFixedDate(id: Id): Promise<void>;
+	restoreFixedDate(id: Id): Promise<void>;
 
 	// -- weeks ---------------------------------------------------------------
 	ensureCurrentWeek(): Promise<Week>;

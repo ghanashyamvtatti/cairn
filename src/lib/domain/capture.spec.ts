@@ -270,16 +270,33 @@ describe('parseCaptureWith, determinism', () => {
 });
 
 describe('parseCaptureWith, hyphenated words that end in a preposition-like token', () => {
-	// `tidy` only claims to drop a preposition "left where the date phrase used to be".
-	// A hyphenated word is a single token, not a dangling preposition, so it must survive.
-	it.each([
+	/**
+	 * `tidy` only claims to drop a preposition "left where the date phrase used to be".
+	 * A hyphenated word is a single token, not a dangling preposition, so it must survive.
+	 *
+	 * chrono finds nothing in any of these, so `parseCaptureWith` takes the no-date path
+	 * and hands the *whole input* to `tidy` — which is where the text is destroyed.
+	 */
+	const HYPHENATED = [
 		{ input: 'Fix the add-on', expected: 'Fix the add-on' },
+		{ input: 'Check the drop-by', expected: 'Check the drop-by' },
 		{ input: 'On-call rota', expected: 'On-call rota' }
-	])('keeps $input intact in the title', ({ input, expected }) => {
+	] as const;
+
+	it.each(HYPHENATED)('finds no date in $input', ({ input }) => {
 		const result = parse(input);
 
 		expect(result.date).toBeNull();
-		expect(result.title).toBe(expected);
+		expect(result.matched).toBeNull();
+		expect(result.raw).toBe(input);
+	});
+
+	// REGRESSION — the preposition strips once allowed `-` as a separator, which ate the
+	// tail of a hyphenated last word ("add-on" -> "add") and the head of a hyphenated
+	// first word ("On-call" -> "call"). A preposition only dangles when whitespace
+	// separates it, so the separator classes are whitespace-only.
+	it.each(HYPHENATED)('keeps $input intact in the title', ({ input, expected }) => {
+		expect(parse(input).title).toBe(expected);
 	});
 });
 

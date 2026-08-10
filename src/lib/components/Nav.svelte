@@ -1,10 +1,12 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import { resolve } from '$app/paths';
 	import { app } from '$lib/stores/app.svelte';
+	import type { AppRoute } from '$lib/routes';
 	import Icon, { type IconName } from './Icon.svelte';
 
 	interface NavItem {
-		href: string;
+		href: AppRoute;
 		label: string;
 		icon: IconName;
 		/** Count shown beside the label. Never rendered when zero. */
@@ -25,7 +27,7 @@
 		{ href: '/review', label: 'Review', icon: 'review' }
 	]);
 
-	function isCurrent(href: string): boolean {
+	function isCurrent(href: AppRoute): boolean {
 		return href === '/' ? page.url.pathname === '/' : page.url.pathname.startsWith(href);
 	}
 </script>
@@ -33,7 +35,7 @@
 <nav class="nav" aria-label="Main">
 	{#each items as item (item.href)}
 		<a
-			href={item.href}
+			href={resolve(item.href)}
 			class="item"
 			class:current={isCurrent(item.href)}
 			aria-current={isCurrent(item.href) ? 'page' : undefined}

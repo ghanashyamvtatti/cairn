@@ -226,7 +226,11 @@ function readSettings(raw: unknown): Partial<SettingsMap> {
 	if (typeof raw.persistGranted === 'boolean') {
 		assign('persistGranted', raw.persistGranted);
 	}
-	for (const key of ['persistNudgeDismissedAt', 'installNudgeDismissedAt', 'lastExportAt'] as const) {
+	for (const key of [
+		'persistNudgeDismissedAt',
+		'installNudgeDismissedAt',
+		'lastExportAt'
+	] as const) {
 		if (raw[key] !== undefined) assign(key, nullableNum(raw[key]));
 	}
 
@@ -304,7 +308,10 @@ export function parseBackup(raw: unknown, now: Timestamp): ImportResult {
 	const weeks = readCollection(dataRaw.weeks, 'week', readWeek, now, warnings);
 	const settings = readSettings(dataRaw.settings);
 
-	const repaired = repairReferences({ projects, tasks, inboxItems, fixedDates, weeks, settings }, warnings);
+	const repaired = repairReferences(
+		{ projects, tasks, inboxItems, fixedDates, weeks, settings },
+		warnings
+	);
 
 	return { ok: true, data: repaired, exportedAt: nullableNum(raw.exportedAt), warnings };
 }
@@ -342,11 +349,25 @@ export function repairReferences(data: BackupData, warnings: string[]): BackupDa
 			(t) => t.projectId === project.id && t.isNextAction && t.deletedAt === null
 		);
 
+		/*
+		 * Only an incomplete task can actually move a project, so a finished one must
+		 * never win the tie-break. Without this, a stale flag left on a completed task
+		 * with a recent `updatedAt` would beat the real next action, the real one would be
+		 * cleared as a duplicate, and the completed winner would then be cleared by the
+		 * check below — importing the project stalled and silently losing the user's
+		 * actual next step.
+		 *
+		 * When nothing incomplete is flagged we still fall back to the full candidate
+		 * list, so the completed task reaches that check and gets its flag cleared.
+		 */
+		const eligible = candidates.filter((t) => t.completedAt === null);
+		const pool = eligible.length > 0 ? eligible : candidates;
+
 		// Prefer whatever the project already points at; otherwise the most recently
 		// updated flagged task wins.
-		let chosen = candidates.find((t) => t.id === project.nextActionId) ?? null;
-		if (!chosen && candidates.length > 0) {
-			chosen = [...candidates].sort((a, b) => b.updatedAt - a.updatedAt)[0];
+		let chosen = pool.find((t) => t.id === project.nextActionId) ?? null;
+		if (!chosen && pool.length > 0) {
+			chosen = [...pool].sort((a, b) => b.updatedAt - a.updatedAt)[0];
 		}
 
 		for (const candidate of candidates) {
@@ -397,9 +418,22 @@ export function repairReferences(data: BackupData, warnings: string[]): BackupDa
 	return data;
 }
 
-/** Fills in defaults for anything the imported file did not carry. */
+/**
+ * Fills in defaults for anything the imported file did not carry.
+ *
+ * Copies key by key rather than spreading, and only for keys the current build knows
+ * about. Object spread copies an own `__proto__` property straight through — which is
+ * exactly what `JSON.parse` produces from a hand-edited file — and that value would
+ * then be persisted and later assigned, invoking the prototype setter.
+ */
 export function withSettingDefaults(partial: Partial<SettingsMap>): SettingsMap {
-	return { ...DEFAULT_SETTINGS, ...partial };
+	const merged = { ...DEFAULT_SETTINGS };
+	for (const key of Object.keys(DEFAULT_SETTINGS) as SettingKey[]) {
+		if (Object.hasOwn(partial, key) && partial[key] !== undefined) {
+			(merged as Record<string, unknown>)[key] = partial[key];
+		}
+	}
+	return merged;
 }
 
 export interface BackupCounts {

@@ -1,0 +1,184 @@
+<script lang="ts">
+	import { format } from 'date-fns';
+	import { countdownFor, parseIsoDate } from '$lib/domain/countdown';
+	import { app } from '$lib/stores/app.svelte';
+	import { toasts } from '$lib/stores/toasts.svelte';
+	import type { FixedDate } from '$lib/types';
+	import Dialog from './Dialog.svelte';
+	import Icon from './Icon.svelte';
+
+	interface Props {
+		entry: FixedDate;
+	}
+
+	let { entry }: Props = $props();
+
+	const countdown = $derived(countdownFor(entry.date, app.now));
+	const parsed = $derived(parseIsoDate(entry.date));
+	const weekday = $derived(parsed ? format(parsed, 'EEE d MMM yyyy') : entry.date);
+
+	let editOpen = $state(false);
+	let titleDraft = $state('');
+	let dateDraft = $state('');
+	let noteDraft = $state('');
+
+	function openEdit() {
+		titleDraft = entry.title;
+		dateDraft = entry.date;
+		noteDraft = entry.note ?? '';
+		editOpen = true;
+	}
+
+	async function save() {
+		const title = titleDraft.trim();
+		if (title === '' || !parseIsoDate(dateDraft)) return;
+
+		await app.repository.updateFixedDate(entry.id, {
+			title,
+			date: dateDraft,
+			note: noteDraft.trim()
+		});
+		editOpen = false;
+	}
+
+	async function remove() {
+		const { id, title } = entry;
+		await app.repository.deleteFixedDate(id);
+		editOpen = false;
+		toasts.show(`Removed “${title}”.`, {
+			action: { label: 'Undo', run: () => void app.repository.restoreFixedDate(id) }
+		});
+	}
+</script>
+
+<!--
+  There is no checkbox here, and there cannot be one: `FixedDate` has no completion
+  field and the repository exposes no way to complete one. "A calendar item is not a
+  task" is enforced by the schema rather than by hiding a control.
+-->
+<li class="row" data-tone={countdown?.tone ?? 'far'} data-testid="manifest-row">
+	<span class="days numeric" aria-hidden="true">{countdown?.shortLabel ?? '—'}</span>
+
+	<button type="button" class="body" onclick={openEdit}>
+		<span class="title">{entry.title}</span>
+		<span class="meta">
+			<span class="when">{countdown?.label ?? 'Unreadable date'}</span>
+			<span class="date">{weekday}</span>
+		</span>
+		{#if entry.note}
+			<span class="note">{entry.note}</span>
+		{/if}
+	</button>
+
+	<span class="visually-hidden">{countdown?.label ?? entry.date}</span>
+</li>
+
+<Dialog bind:open={editOpen} title="Edit date" onclose={() => (editOpen = false)}>
+	<div class="field">
+		<label for={`title-${entry.id}`}>What is it?</label>
+		<input id={`title-${entry.id}`} class="input" bind:value={titleDraft} />
+	</div>
+	<div class="field">
+		<label for={`date-${entry.id}`}>When</label>
+		<input id={`date-${entry.id}`} class="input" type="date" bind:value={dateDraft} />
+	</div>
+	<div class="field">
+		<label for={`note-${entry.id}`}>Note (optional)</label>
+		<input id={`note-${entry.id}`} class="input" bind:value={noteDraft} />
+	</div>
+
+	{#snippet footer()}
+		<button type="button" class="btn btn-danger" onclick={remove} data-testid="manifest-delete">
+			<Icon name="trash" size={16} /> Remove
+		</button>
+		<button type="button" class="btn btn-primary" onclick={save}>Save</button>
+	{/snippet}
+</Dialog>
+
+<style>
+	.row {
+		display: flex;
+		align-items: stretch;
+		gap: var(--space-4);
+		border-bottom: 1px solid var(--stone-border);
+	}
+
+	.row:last-child {
+		border-bottom: none;
+	}
+
+	.days {
+		flex-shrink: 0;
+		width: 3.25rem;
+		display: grid;
+		place-items: center;
+		font-size: var(--text-lg);
+		font-weight: 600;
+		letter-spacing: -0.02em;
+		color: var(--stone-text-faint);
+	}
+
+	.row[data-tone='today'] .days,
+	.row[data-tone='imminent'] .days {
+		color: var(--stone-attention);
+	}
+
+	.row[data-tone='near'] .days {
+		color: var(--stone-text);
+	}
+
+	.row[data-tone='passed'] .days {
+		color: var(--stone-text-faint);
+		font-weight: 400;
+	}
+
+	.body {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		gap: 0.125rem;
+		background: none;
+		border: none;
+		padding: var(--space-3) var(--space-2) var(--space-3) 0;
+		text-align: left;
+		cursor: pointer;
+		color: inherit;
+		border-radius: var(--radius-sm);
+	}
+
+	.body:hover .title {
+		color: var(--stone-accent-text);
+	}
+
+	.title {
+		font-size: var(--text-base);
+		font-weight: 500;
+	}
+
+	.row[data-tone='passed'] .title {
+		color: var(--stone-text-muted);
+		font-weight: 400;
+	}
+
+	.meta {
+		display: flex;
+		gap: var(--space-2);
+		font-size: var(--text-sm);
+		color: var(--stone-text-muted);
+	}
+
+	.date {
+		color: var(--stone-text-faint);
+	}
+
+	.date::before {
+		content: '·';
+		margin-right: var(--space-2);
+	}
+
+	.note {
+		font-size: var(--text-sm);
+		color: var(--stone-text-faint);
+		margin-top: var(--space-1);
+	}
+</style>

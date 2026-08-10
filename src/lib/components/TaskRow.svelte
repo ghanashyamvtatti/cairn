@@ -30,13 +30,14 @@
 	}
 
 	async function remove() {
-		await app.repository.deleteTask(task.id);
-		toasts.show('Task removed.', {
+		const { id, title } = task;
+		await app.repository.deleteTask(id);
+		toasts.show(`Removed “${title}”.`, {
 			action: {
 				label: 'Undo',
 				// Soft deletes make undo a one-line restore rather than a re-creation, which
-				// is why destructive actions here do not need a confirmation dialog.
-				run: () => void app.repository.setNextAction
+				// is why removing something here never needs a confirmation dialog.
+				run: () => void app.repository.restoreTask(id)
 			}
 		});
 	}

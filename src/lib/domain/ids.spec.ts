@@ -48,9 +48,7 @@ describe('newId', () => {
 	});
 
 	it('returns ids that are all in the version 4 shape across many draws', () => {
-		const offenders = Array.from({ length: 1000 }, () => newId()).filter(
-			(id) => !UUID_V4.test(id)
-		);
+		const offenders = Array.from({ length: 1000 }, () => newId()).filter((id) => !UUID_V4.test(id));
 
 		expect(offenders).toEqual([]);
 	});

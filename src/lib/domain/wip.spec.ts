@@ -47,9 +47,7 @@ function idsOf(projects: readonly Project[]): string[] {
 }
 
 /** Asserts a warn decision and narrows it, so the branch data can be inspected. */
-function expectWarn(
-	decision: AddProjectDecision
-): Extract<AddProjectDecision, { kind: 'warn' }> {
+function expectWarn(decision: AddProjectDecision): Extract<AddProjectDecision, { kind: 'warn' }> {
 	expect(decision.kind).toBe('warn');
 	if (decision.kind !== 'warn') throw new Error('expected a warn decision');
 	return decision;

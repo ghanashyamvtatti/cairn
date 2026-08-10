@@ -562,36 +562,30 @@ describe('partitionByDate', () => {
 		);
 	});
 
-	it('breaks upcoming ties on the same date by title then id', () => {
-		const date = isoFromNow(4);
-		const items = [
-			fixed('beta-2', 'Beta', date),
-			fixed('alpha-2', 'Alpha', date),
-			fixed('beta-1', 'Beta', date),
-			fixed('alpha-1', 'Alpha', date)
+	/*
+	 * Ids deliberately disagree with titles here. If the ids sorted the same way the
+	 * titles do, the fixture could not tell "title then id" apart from "id alone":
+	 * sorting by id only would lead with `a-beta`, and sorting by title only would
+	 * leave the two Betas in input order, so both orderings are ruled out.
+	 */
+	const TIE_BREAK_IDS = ['z-alpha', 'a-beta', 'm-beta'];
+
+	function tiedItems(date: IsoDate): FixedDate[] {
+		return [
+			fixed('m-beta', 'Beta', date),
+			fixed('z-alpha', 'Alpha', date),
+			fixed('a-beta', 'Beta', date)
 		];
-		expect(partitionByDate(items, NOW).upcoming.map((item) => item.id)).toEqual([
-			'alpha-1',
-			'alpha-2',
-			'beta-1',
-			'beta-2'
-		]);
+	}
+
+	it('breaks upcoming ties on the same date by title first, then by id', () => {
+		const items = tiedItems(isoFromNow(4));
+		expect(partitionByDate(items, NOW).upcoming.map((item) => item.id)).toEqual(TIE_BREAK_IDS);
 	});
 
-	it('breaks passed ties on the same date by title then id as well', () => {
-		const date = isoFromNow(-4);
-		const items = [
-			fixed('beta-2', 'Beta', date),
-			fixed('alpha-2', 'Alpha', date),
-			fixed('beta-1', 'Beta', date),
-			fixed('alpha-1', 'Alpha', date)
-		];
-		expect(partitionByDate(items, NOW).passed.map((item) => item.id)).toEqual([
-			'alpha-1',
-			'alpha-2',
-			'beta-1',
-			'beta-2'
-		]);
+	it('breaks passed ties on the same date by title first, then by id as well', () => {
+		const items = tiedItems(isoFromNow(-4));
+		expect(partitionByDate(items, NOW).passed.map((item) => item.id)).toEqual(TIE_BREAK_IDS);
 	});
 
 	it('produces the same output order for shuffled input orders', () => {

@@ -35,14 +35,24 @@ export interface CapturedText {
 }
 
 function tidy(value: string): string {
-	return value
-		.replace(/\s+/g, ' ')
-		.replace(/\s+([,.;:!?])/g, '$1')
-		// Drop a dangling preposition or separator left where the date phrase used to be.
-		.replace(/[\s,;:-]*\b(on|by|due|at|before)\s*$/i, '')
-		.replace(/^[\s,;:-]*\b(on|by|due|at|before)\b[\s,;:-]*/i, '')
-		.replace(/^[\s,;:.-]+|[\s,;:-]+$/g, '')
-		.trim();
+	return (
+		value
+			.replace(/\s+/g, ' ')
+			.replace(/\s+([,.;:!?])/g, '$1')
+			/*
+			 * Drop a preposition left dangling where the date phrase used to be, so
+			 * "Dentist on 3 March" yields "Dentist" rather than "Dentist on".
+			 *
+			 * The separator must be whitespace. An earlier version allowed `-` here, which
+			 * quietly destroyed hyphenated words: "Fix the add-on" became "Fix the add" and
+			 * "On-call rota" became "call rota". It also swallowed a title that was itself
+			 * just the word "on". A preposition only dangles when it stands alone.
+			 */
+			.replace(/\s+(on|by|due|at|before)\s*$/i, '')
+			.replace(/^(on|by|due|at|before)\s+/i, '')
+			.replace(/^[\s,;:.]+|[\s,;:]+$/g, '')
+			.trim()
+	);
 }
 
 /**

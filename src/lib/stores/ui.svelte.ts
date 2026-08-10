@@ -1,4 +1,6 @@
 import { goto } from '$app/navigation';
+import { resolve } from '$app/paths';
+import { ROUTES, type AppRoute } from '$lib/routes';
 
 export interface ShortcutDefinition {
 	keys: string;
@@ -16,13 +18,13 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
 	{ keys: 'Esc', description: 'Close whatever is open' }
 ] as const;
 
-const GOTO_TARGETS: Record<string, string> = {
-	p: '/',
-	h: '/',
-	m: '/manifest',
-	i: '/inbox',
-	r: '/review',
-	s: '/settings'
+const GOTO_TARGETS: Record<string, AppRoute> = {
+	p: ROUTES.home,
+	h: ROUTES.home,
+	m: ROUTES.manifest,
+	i: ROUTES.inbox,
+	r: ROUTES.review,
+	s: ROUTES.settings
 };
 
 /** How long a `g` prefix stays armed before it is forgotten. */
@@ -66,7 +68,7 @@ class UiStore {
 			const target = GOTO_TARGETS[key.toLowerCase()];
 			if (target) {
 				event.preventDefault();
-				void goto(target);
+				void goto(resolve(target));
 				return;
 			}
 		}

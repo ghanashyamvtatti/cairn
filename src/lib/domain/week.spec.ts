@@ -261,9 +261,7 @@ describe('planWeekReset — filing finished work', () => {
 	it('still counts already-filed work in the archived total', () => {
 		const plan = planWeekReset(
 			baseInput({
-				tasks: [
-					makeTask('t-done-current', { completedAt: NOW - HOUR_MS, weekId: CURRENT_WEEK_ID })
-				]
+				tasks: [makeTask('t-done-current', { completedAt: NOW - HOUR_MS, weekId: CURRENT_WEEK_ID })]
 			})
 		);
 

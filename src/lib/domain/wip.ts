@@ -36,7 +36,7 @@ export function stalledProjects(projects: readonly Project[]): Project[] {
 }
 
 export interface WipStatus {
-	activeCount: number
+	activeCount: number;
 	limit: number;
 	/** Strictly more active projects than the limit allows. */
 	isOverLimit: boolean;
@@ -82,10 +82,7 @@ export type AddProjectDecision =
  * Returns `warn` when the new project would sit at or beyond the limit, so the prompt
  * appears *before* you cross the line rather than after.
  */
-export function decideAddProject(
-	projects: readonly Project[],
-	limit: number
-): AddProjectDecision {
+export function decideAddProject(projects: readonly Project[], limit: number): AddProjectDecision {
 	const status = wipStatus(projects, limit);
 
 	if (status.activeCount < status.limit) {

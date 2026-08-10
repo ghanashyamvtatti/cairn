@@ -162,7 +162,11 @@ function realisticData(): BackupData {
 		],
 		fixedDates: [
 			makeFixedDate('date-passport', { title: 'Passport expires', date: '2026-11-14' }),
-			makeFixedDate('date-mot', { title: 'MOT due', date: '2027-02-28', note: 'Garage on Mill Road' })
+			makeFixedDate('date-mot', {
+				title: 'MOT due',
+				date: '2027-02-28',
+				note: 'Garage on Mill Road'
+			})
 		],
 		weeks: [
 			makeWeek('week-previous', {
@@ -322,9 +326,7 @@ describe('parseBackup rejection', () => {
 	});
 
 	it('refuses a backup from a newer build and says to update the app', () => {
-		const message = expectRejected(
-			parseBackup(rawFile({}, { version: BACKUP_VERSION + 1 }), NOW)
-		);
+		const message = expectRejected(parseBackup(rawFile({}, { version: BACKUP_VERSION + 1 }), NOW));
 
 		expect(message).toMatch(/newer version of Cairn/i);
 		expect(message).toMatch(/update the app/i);
@@ -792,6 +794,40 @@ describe('repairReferences: one next action per project', () => {
 		expect(stalledProjects(repaired.projects).map((p) => p.id)).toEqual(['project-kitchen']);
 	});
 
+	/**
+	 * REGRESSION — the tie-break once considered completed tasks, so a stale flag left on
+	 * a finished task could out-rank the real next action on `updatedAt`. The live task
+	 * was then cleared as a duplicate and the completed winner cleared a moment later by
+	 * the "a completed task cannot be a next action" check, so the project imported
+	 * stalled and the user's actual next step was silently gone. Only incomplete tasks
+	 * are eligible to win.
+	 */
+	it('prefers a live incomplete flagged task over a stale completed one', () => {
+		const warnings: string[] = [];
+		const data = makeData({
+			projects: [makeProject('project-kitchen', { nextActionId: null })],
+			tasks: [
+				makeTask('task-chain', {
+					projectId: 'project-kitchen',
+					isNextAction: true,
+					completedAt: LAST_WEEK,
+					updatedAt: NOW
+				}),
+				makeTask('task-grout', {
+					projectId: 'project-kitchen',
+					isNextAction: true,
+					updatedAt: LAST_MONTH
+				})
+			]
+		});
+
+		const repaired = repairReferences(data, warnings);
+
+		expect(nextActionIds(repaired.tasks)).toEqual(['task-grout']);
+		expect(repaired.projects[0].nextActionId).toBe('task-grout');
+		expect(stalledProjects(repaired.projects)).toEqual([]);
+	});
+
 	it('never chooses a soft-deleted task as the next action', () => {
 		const warnings: string[] = [];
 		const data = makeData({
@@ -893,7 +929,9 @@ describe('parseBackup repairs references end to end', () => {
 		const result = expectImported(
 			parseBackup(
 				rawFile({
-					projects: [{ id: 'project-kitchen', title: 'Retile the kitchen', nextActionId: 'task-ghost' }],
+					projects: [
+						{ id: 'project-kitchen', title: 'Retile the kitchen', nextActionId: 'task-ghost' }
+					],
 					tasks: [
 						{
 							id: 'task-tiles',

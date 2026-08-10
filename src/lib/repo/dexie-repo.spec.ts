@@ -16,6 +16,7 @@ import {
 	type InboxItem,
 	type Project,
 	type Setting,
+	type SettingsMap,
 	type Task,
 	type Week
 } from '$lib/types';
@@ -242,13 +243,33 @@ describe('setSetting', () => {
 	});
 
 	it('never surfaces a stored key that is not part of the settings map', async () => {
-		await db.settings.put({ key: 'somethingFromAFutureBuild', value: 'nope' } as unknown as Setting);
+		await db.settings.put({
+			key: 'somethingFromAFutureBuild',
+			value: 'nope'
+		} as unknown as Setting);
 		await repo.setSetting('wipLimit', 4);
 
 		const snapshot = await repo.readSnapshot();
 
 		expect(Object.keys(snapshot.settings).sort()).toEqual(Object.keys(DEFAULT_SETTINGS).sort());
 		expect(snapshot.settings).toEqual({ ...DEFAULT_SETTINGS, wipLimit: 4 });
+	});
+
+	// REGRESSION — `mergeSettings` once gated unknown keys with `row.key in merged`, and
+	// `in` walks the prototype chain, so any row keyed after an `Object.prototype` member
+	// passed as known: `constructor` and `toString` leaked into `Snapshot.settings`, and
+	// assigning `__proto__` invoked the inherited setter and replaced the object's
+	// prototype outright. The gate is now `Object.hasOwn(DEFAULT_SETTINGS, row.key)`.
+	it('never surfaces a stored key that only exists on Object.prototype', async () => {
+		await db.settings.put({ key: 'constructor', value: 1 } as unknown as Setting);
+		await db.settings.put({ key: 'toString', value: 2 } as unknown as Setting);
+		await db.settings.put({ key: '__proto__', value: { wipLimit: 999 } } as unknown as Setting);
+
+		const { settings } = await repo.readSnapshot();
+
+		expect(Object.keys(settings).sort()).toEqual(Object.keys(DEFAULT_SETTINGS).sort());
+		expect(Object.getPrototypeOf(settings)).toBe(Object.prototype);
+		expect(settings).toEqual(DEFAULT_SETTINGS);
 	});
 });
 
@@ -863,6 +884,30 @@ describe('backup round-trip', () => {
 		expect(openWeeks(snapshot.weeks)).toHaveLength(1);
 		expect(snapshot.currentWeek?.startedAt).toBe(at);
 		expect(snapshot.weeks).toHaveLength(2);
+	});
+
+	// REGRESSION — the same defect reached through the public API with no cast and no
+	// hand-written row. Object spread copies an own `__proto__` key as an ordinary
+	// property, which is exactly what `JSON.parse` yields for a hand-edited file, so
+	// `importAll` used to persist a settings row keyed `__proto__` and the next read
+	// assigned it. `withSettingDefaults` now copies known keys explicitly.
+	it('does not let a `__proto__` key in the backup settings reshape the snapshot', async () => {
+		const backup: BackupData = {
+			projects: [],
+			tasks: [],
+			inboxItems: [],
+			fixedDates: [],
+			weeks: [],
+			// Exactly what `JSON.parse` yields for a hand-edited or third-party file: an
+			// own enumerable property, not a prototype change.
+			settings: JSON.parse('{"__proto__":{"wipLimit":999}}') as Partial<SettingsMap>
+		};
+
+		await repo.importAll(backup);
+		const { settings } = await repo.readSnapshot();
+
+		expect(Object.getPrototypeOf(settings)).toBe(Object.prototype);
+		expect(settings).toEqual(DEFAULT_SETTINGS);
 	});
 
 	it('restores rows the backup carried, including soft-deleted ones', async () => {

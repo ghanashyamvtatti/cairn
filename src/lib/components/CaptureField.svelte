@@ -11,11 +11,7 @@
 		oncaptured?: (text: string) => void;
 	}
 
-	let {
-		autofocus = false,
-		placeholder = 'What is on your mind?',
-		oncaptured
-	}: Props = $props();
+	let { autofocus = false, placeholder = 'What is on your mind?', oncaptured }: Props = $props();
 
 	let value = $state('');
 	let input = $state<HTMLInputElement | null>(null);
@@ -71,7 +67,7 @@
 
 		busy = true;
 		try {
-			await app.repository.captureInboxItem(text, usable?.date);
+			await app.repository.captureInboxItem(text, usable?.date ?? undefined);
 			value = '';
 			parsed = null;
 			parsedFor = '';

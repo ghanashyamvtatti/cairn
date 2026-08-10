@@ -258,6 +258,10 @@ export class DexieRepository implements CairnRepository {
 		});
 	}
 
+	async restoreTask(id: Id): Promise<void> {
+		await this.db.tasks.update(id, { deletedAt: null, updatedAt: this.now() });
+	}
+
 	// -----------------------------------------------------------------------
 	// Inbox
 	// -----------------------------------------------------------------------
@@ -284,6 +288,10 @@ export class DexieRepository implements CairnRepository {
 	async deleteInboxItem(id: Id): Promise<void> {
 		const now = this.now();
 		await this.db.inboxItems.update(id, { deletedAt: now, updatedAt: now });
+	}
+
+	async restoreInboxItem(id: Id): Promise<void> {
+		await this.db.inboxItems.update(id, { deletedAt: null, updatedAt: this.now() });
 	}
 
 	async triageInboxItem(id: Id, action: TriageAction): Promise<void> {
@@ -364,6 +372,10 @@ export class DexieRepository implements CairnRepository {
 		await this.db.fixedDates.update(id, { deletedAt: now, updatedAt: now });
 	}
 
+	async restoreFixedDate(id: Id): Promise<void> {
+		await this.db.fixedDates.update(id, { deletedAt: null, updatedAt: this.now() });
+	}
+
 	// -----------------------------------------------------------------------
 	// Weeks
 	// -----------------------------------------------------------------------
@@ -395,35 +407,29 @@ export class DexieRepository implements CairnRepository {
 		const now = this.now();
 		const newWeekId = newId();
 
-		return this.db.transaction(
-			'rw',
-			this.db.projects,
-			this.db.tasks,
-			this.db.weeks,
-			async () => {
-				const currentWeek = await this.ensureCurrentWeek();
-				const tasks = await this.db.tasks.toArray();
-				const projects = await this.db.projects.toArray();
+		return this.db.transaction('rw', this.db.projects, this.db.tasks, this.db.weeks, async () => {
+			const currentWeek = await this.ensureCurrentWeek();
+			const tasks = await this.db.tasks.toArray();
+			const projects = await this.db.projects.toArray();
 
-				const plan = planWeekReset({ tasks, projects, currentWeek, now, newWeekId });
+			const plan = planWeekReset({ tasks, projects, currentWeek, now, newWeekId });
 
-				if (plan.closedWeek) {
-					await this.db.weeks.update(plan.closedWeek.id, { endedAt: plan.closedWeek.endedAt });
-				}
-				await this.db.weeks.add(plan.newWeek);
-
-				for (const { id, weekId } of plan.archive) {
-					await this.db.tasks.update(id, { weekId });
-				}
-				for (const { id, weekId } of plan.carry) {
-					// Deliberately no `updatedAt` bump and no status change: carrying work
-					// forward is not an edit, and nothing about it should read as late.
-					await this.db.tasks.update(id, { weekId });
-				}
-
-				return plan.summary;
+			if (plan.closedWeek) {
+				await this.db.weeks.update(plan.closedWeek.id, { endedAt: plan.closedWeek.endedAt });
 			}
-		);
+			await this.db.weeks.add(plan.newWeek);
+
+			for (const { id, weekId } of plan.archive) {
+				await this.db.tasks.update(id, { weekId });
+			}
+			for (const { id, weekId } of plan.carry) {
+				// Deliberately no `updatedAt` bump and no status change: carrying work
+				// forward is not an edit, and nothing about it should read as late.
+				await this.db.tasks.update(id, { weekId });
+			}
+
+			return plan.summary;
+		});
 	}
 
 	// -----------------------------------------------------------------------
@@ -456,35 +462,26 @@ export class DexieRepository implements CairnRepository {
 	async importAll(data: BackupData): Promise<ImportSummary> {
 		const settings = withSettingDefaults(data.settings);
 
-		await this.db.transaction(
-			'rw',
-			this.db.projects,
-			this.db.tasks,
-			this.db.inboxItems,
-			this.db.fixedDates,
-			this.db.weeks,
-			this.db.settings,
-			async () => {
-				await this.db.projects.clear();
-				await this.db.tasks.clear();
-				await this.db.inboxItems.clear();
-				await this.db.fixedDates.clear();
-				await this.db.weeks.clear();
-				await this.db.settings.clear();
+		// Dexie's variadic `transaction` overload tops out at five tables; past that the
+		// array form is required. All six are listed because a partially-replaced
+		// database is worse than a failed import.
+		await this.db.transaction('rw', this.allTables(), async () => {
+			await this.db.projects.clear();
+			await this.db.tasks.clear();
+			await this.db.inboxItems.clear();
+			await this.db.fixedDates.clear();
+			await this.db.weeks.clear();
+			await this.db.settings.clear();
 
-				await this.db.projects.bulkAdd(data.projects);
-				await this.db.tasks.bulkAdd(data.tasks);
-				await this.db.inboxItems.bulkAdd(data.inboxItems);
-				await this.db.fixedDates.bulkAdd(data.fixedDates);
-				await this.db.weeks.bulkAdd(data.weeks);
-				await this.db.settings.bulkAdd(
-					(Object.entries(settings) as Array<[SettingKey, never]>).map(([key, value]) => ({
-						key,
-						value
-					}))
-				);
-			}
-		);
+			await this.db.projects.bulkAdd(data.projects);
+			await this.db.tasks.bulkAdd(data.tasks);
+			await this.db.inboxItems.bulkAdd(data.inboxItems);
+			await this.db.fixedDates.bulkAdd(data.fixedDates);
+			await this.db.weeks.bulkAdd(data.weeks);
+			await this.db.settings.bulkAdd(
+				Object.entries(settings).map(([key, value]) => ({ key, value }) as Setting)
+			);
+		});
 
 		// An import with no open week would leave the app with nowhere to file new work.
 		await this.ensureCurrentWeek();
@@ -499,34 +496,51 @@ export class DexieRepository implements CairnRepository {
 	}
 
 	async clearAll(): Promise<void> {
-		await this.db.transaction(
-			'rw',
+		await this.db.transaction('rw', this.allTables(), async () => {
+			await this.db.projects.clear();
+			await this.db.tasks.clear();
+			await this.db.inboxItems.clear();
+			await this.db.fixedDates.clear();
+			await this.db.weeks.clear();
+			await this.db.settings.clear();
+		});
+	}
+
+	private allTables() {
+		return [
 			this.db.projects,
 			this.db.tasks,
 			this.db.inboxItems,
 			this.db.fixedDates,
 			this.db.weeks,
-			this.db.settings,
-			async () => {
-				await this.db.projects.clear();
-				await this.db.tasks.clear();
-				await this.db.inboxItems.clear();
-				await this.db.fixedDates.clear();
-				await this.db.weeks.clear();
-				await this.db.settings.clear();
-			}
-		);
+			this.db.settings
+		];
 	}
 }
 
+/**
+ * Layers stored settings over the defaults, ignoring keys the current build does not
+ * know about — a backup from a newer version must not inject junk into the map.
+ *
+ * The gate is `Object.hasOwn`, not `in`. `in` walks the prototype chain, so a row keyed
+ * `constructor`, `toString` or `__proto__` would pass as "known"; worse, assigning to
+ * `__proto__` invokes the inherited setter and replaces the object's prototype instead
+ * of adding a property. A hand-edited backup file is untrusted input and can contain
+ * exactly that.
+ */
 function mergeSettings(rows: readonly Setting[]): SettingsMap {
-	const merged: SettingsMap = { ...DEFAULT_SETTINGS };
+	const merged = { ...DEFAULT_SETTINGS } as Record<string, unknown>;
 	for (const row of rows) {
-		if (row.key in merged) {
-			(merged as Record<string, unknown>)[row.key] = row.value;
+		if (Object.hasOwn(DEFAULT_SETTINGS, row.key)) {
+			Object.defineProperty(merged, row.key, {
+				value: row.value,
+				writable: true,
+				enumerable: true,
+				configurable: true
+			});
 		}
 	}
-	return merged;
+	return merged as unknown as SettingsMap;
 }
 
 let repository: CairnRepository | null = null;
