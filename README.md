@@ -59,11 +59,28 @@ app says so too, at the point where it matters.
 
 ## Deploying
 
-Static output, so anything that serves files will do. For Cloudflare Pages:
+Static output, so anything that serves files will do. No environment variables, no
+server, no bindings, no secrets.
+
+**Cloudflare Pages, from the dashboard (recommended).** Create a Pages project, connect
+this repository, and set:
 
 - Build command: `npm run build`
 - Output directory: `build`
-- No environment variables, no server, no bindings.
+
+Every push to `main` then deploys itself.
+
+**Cloudflare Pages, from the CLI.** `wrangler.jsonc` already points at `build/`, so:
+
+```bash
+npm run build && npx wrangler pages deploy
+```
+
+This needs an API token with the **Cloudflare Pages → Edit** permission. A token with
+only account-read scope authenticates successfully and then fails the deploy with
+`Authentication error [code: 10000]`, which is easy to misread as a login problem — add
+the Pages permission at
+[dash.cloudflare.com/profile/api-tokens](https://dash.cloudflare.com/profile/api-tokens).
 
 ## How it is built
 

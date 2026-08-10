@@ -1,0 +1,11 @@
+{
+	// Cloudflare Pages configuration.
+	//
+	// Cairn is a pure static site: no Worker, no bindings, no secrets, no server. This
+	// file exists so `wrangler pages deploy` needs no flags and so the Pages dashboard
+	// picks up the right output directory automatically.
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "cairn",
+	"compatibility_date": "2026-08-10",
+	"pages_build_output_dir": "build"
+}
