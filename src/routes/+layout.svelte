@@ -30,6 +30,16 @@
 	 * localStorage is only a paint hint, so losing it costs nothing.
 	 */
 	$effect(() => {
+		/*
+		 * Wait for the first snapshot.
+		 *
+		 * `app.settings` starts at defaults, so running before IndexedDB answers stripped
+		 * the `data-theme` the inline head script had just applied and wrote "system" over
+		 * the localStorage hint — undoing the pre-paint work and re-flashing the wrong
+		 * theme on every single load.
+		 */
+		if (!app.ready) return;
+
 		const { theme, motion } = app.settings;
 		const root = document.documentElement;
 

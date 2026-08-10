@@ -1,5 +1,17 @@
+<script lang="ts" module>
+	/**
+	 * Built once for the whole list. Constructing an `Intl.DateTimeFormat` is expensive
+	 * enough that doing it per row is noticeable on a long board.
+	 */
+	const fullDateFormat = new Intl.DateTimeFormat('en-GB', {
+		weekday: 'short',
+		day: 'numeric',
+		month: 'short',
+		year: 'numeric'
+	});
+</script>
+
 <script lang="ts">
-	import { format } from 'date-fns';
 	import { countdownFor, parseIsoDate } from '$lib/domain/countdown';
 	import { app } from '$lib/stores/app.svelte';
 	import { toasts } from '$lib/stores/toasts.svelte';
@@ -15,7 +27,7 @@
 
 	const countdown = $derived(countdownFor(entry.date, app.now));
 	const parsed = $derived(parseIsoDate(entry.date));
-	const weekday = $derived(parsed ? format(parsed, 'EEE d MMM yyyy') : entry.date);
+	const weekday = $derived(parsed ? fullDateFormat.format(parsed) : entry.date);
 
 	let editOpen = $state(false);
 	let titleDraft = $state('');
@@ -29,9 +41,21 @@
 		editOpen = true;
 	}
 
+	let saveError = $state<string | null>(null);
+
 	async function save() {
 		const title = titleDraft.trim();
-		if (title === '' || !parseIsoDate(dateDraft)) return;
+
+		// A dead button is worse than a refusal: say which field is the problem.
+		if (title === '') {
+			saveError = 'Give it a name so you can recognise it on the board.';
+			return;
+		}
+		if (!parseIsoDate(dateDraft)) {
+			saveError = 'That date cannot be read. Pick a day between years 1000 and 9999.';
+			return;
+		}
+		saveError = null;
 
 		await app.repository.updateFixedDate(entry.id, {
 			title,
@@ -86,6 +110,10 @@
 		<label for={`note-${entry.id}`}>Note (optional)</label>
 		<input id={`note-${entry.id}`} class="input" bind:value={noteDraft} />
 	</div>
+
+	{#if saveError}
+		<p class="save-error small" role="alert" data-testid="manifest-save-error">{saveError}</p>
+	{/if}
 
 	{#snippet footer()}
 		<button type="button" class="btn btn-danger" onclick={remove} data-testid="manifest-delete">
@@ -180,5 +208,9 @@
 		font-size: var(--text-sm);
 		color: var(--stone-text-faint);
 		margin-top: var(--space-1);
+	}
+
+	.save-error {
+		color: var(--stone-attention);
 	}
 </style>

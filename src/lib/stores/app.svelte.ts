@@ -4,6 +4,7 @@ import { isReviewDue } from '$lib/domain/week';
 import { activeProjects, parkedProjects, stalledProjects, wipStatus } from '$lib/domain/wip';
 import { EMPTY_SNAPSHOT, type CairnRepository, type Snapshot, type Subscription } from '$lib/repo';
 import { getRepository } from '$lib/repo/dexie-repo';
+import { toasts } from '$lib/stores/toasts.svelte';
 import type { FixedDate, Id, InboxItem, Project, Task } from '$lib/types';
 
 function isLive<T extends { deletedAt: number | null }>(row: T): boolean {
@@ -124,16 +125,16 @@ class AppStore {
 	 */
 	async start(repo: CairnRepository = getRepository()): Promise<void> {
 		if (this.subscription) return;
-		this.repo = repo;
+		this.repo = reportWriteFailures(repo);
 
 		try {
-			await repo.ensureCurrentWeek();
+			await this.repo.ensureCurrentWeek();
 		} catch (err) {
 			this.error = describeError(err);
 			return;
 		}
 
-		this.subscription = repo.observeSnapshot().subscribe(
+		this.subscription = this.repo.observeSnapshot().subscribe(
 			(value) => {
 				this.snapshot = value;
 				this.ready = true;
@@ -186,11 +187,78 @@ class AppStore {
 	}
 }
 
+/** Reads that must never pop a toast — they are not user actions. */
+const SILENT_METHODS = new Set(['observeSnapshot', 'readSnapshot', 'ensureCurrentWeek']);
+
+/** Plain-English name for what the user was trying to do. */
+const ACTION_NAMES: Record<string, string> = {
+	captureInboxItem: 'save that',
+	createProject: 'start that project',
+	deleteProject: 'delete that project',
+	restoreProject: 'undo that',
+	addTask: 'add that',
+	completeTask: 'save that',
+	setNextAction: 'set the next action',
+	triageInboxItem: 'file that',
+	addFixedDate: 'add that date',
+	startNewWeek: 'start the new week',
+	importAll: 'restore the backup',
+	exportAll: 'build the backup'
+};
+
+/**
+ * Wraps the repository so a rejected write is reported instead of vanishing.
+ *
+ * Every mutation in this app is a local IndexedDB write, and the realistic failures —
+ * quota exhausted, storage blocked mid-session, a corrupt database — all surface as a
+ * rejected promise. Without this, the UI simply did nothing and said nothing: the
+ * clearest possible way to make someone believe their data is saved when it is not.
+ *
+ * Errors are reported and then swallowed rather than rethrown, so one failed write
+ * cannot take the interface down with it. Callers that need to branch on failure check
+ * for an `undefined` result.
+ */
+function reportWriteFailures(repo: CairnRepository): CairnRepository {
+	return new Proxy(repo, {
+		get(target, property, receiver) {
+			const value = Reflect.get(target, property, receiver);
+			if (typeof value !== 'function' || typeof property !== 'string') return value;
+			if (SILENT_METHODS.has(property)) return value.bind(target);
+
+			return (...args: unknown[]) => {
+				const announce = (error: unknown) => {
+					const what = ACTION_NAMES[property] ?? 'save that';
+					toasts.show(`Could not ${what}. ${describeError(error)}`, {
+						tone: 'attention',
+						ms: 10000
+					});
+				};
+
+				try {
+					const result = (value as (...a: unknown[]) => unknown).apply(target, args);
+					return result instanceof Promise
+						? result.catch((error) => {
+								announce(error);
+								return undefined;
+							})
+						: result;
+				} catch (error) {
+					announce(error);
+					return undefined;
+				}
+			};
+		}
+	});
+}
+
 function describeError(err: unknown): string {
 	if (err instanceof Error) {
 		// The most likely real-world failure is a browser that blocks IndexedDB — private
-		// windows in some browsers, or storage disabled entirely.
-		if (err.name === 'SecurityError' || err.name === 'InvalidStateError') {
+		// windows in some browsers, or storage disabled entirely. Dexie wraps the missing
+		// API in its own error name, and the raw message is a developer note with a link
+		// shortener in it, so match that too.
+		const blocked = ['SecurityError', 'InvalidStateError', 'MissingAPIError', 'UnknownError'];
+		if (blocked.includes(err.name) || /indexeddb/i.test(err.message)) {
 			return 'This browser is blocking local storage, so Cairn cannot save anything. Private browsing usually causes this.';
 		}
 		if (err.name === 'QuotaExceededError') {

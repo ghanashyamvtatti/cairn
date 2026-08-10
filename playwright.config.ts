@@ -27,7 +27,13 @@ export default defineConfig({
 	webServer: {
 		command: 'npm run build && npm run preview -- --port 4173 --strictPort',
 		port: 4173,
-		reuseExistingServer: !process.env.CI,
+		/*
+		 * Never reuse. Reusing meant Playwright skipped the build and pointed a fresh
+		 * suite at whatever an older `vite preview` still had open — which fails as a wall
+		 * of 404s on chunk hashes that no longer exist, and looks like the app is broken
+		 * rather than the server being stale. The build takes about a second.
+		 */
+		reuseExistingServer: false,
 		timeout: 120_000
 	}
 });

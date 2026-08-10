@@ -130,8 +130,10 @@
 				<ManifestRow {entry} />
 			{/each}
 		</ul>
-	{:else}
+	{:else if app.manifest.passed.length > 0}
 		<p class="muted nothing">Nothing ahead. Everything on the board has passed.</p>
+	{:else}
+		<p class="muted nothing">Nothing ahead that Cairn can read.</p>
 	{/if}
 
 	{#if app.manifest.invalid.length > 0}

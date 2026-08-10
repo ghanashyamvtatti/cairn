@@ -118,8 +118,19 @@ export interface CairnRepository {
 	renameProject(id: Id, title: string): Promise<void>;
 	setProjectStatus(id: Id, status: ProjectStatus): Promise<void>;
 	reorderProjects(orderedIds: readonly Id[]): Promise<void>;
-	/** Soft-deletes the project and everything filed under it. */
+	/**
+	 * Soft-deletes the project and everything still live under it.
+	 *
+	 * The next-action pointer and flag are left intact so the delete is exactly
+	 * reversible. Nothing reads them while the rows are tombstoned.
+	 */
 	deleteProject(id: Id): Promise<void>;
+	/**
+	 * Reverses `deleteProject`, restoring the tasks the cascade took with it — and only
+	 * those, identified by sharing the project's deletion timestamp. Tasks deleted
+	 * before the project stay deleted.
+	 */
+	restoreProject(id: Id): Promise<void>;
 
 	// -- tasks ---------------------------------------------------------------
 	addTask(input: NewTaskInput): Promise<Task>;

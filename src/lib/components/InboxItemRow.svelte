@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { countdownFor, toIsoDate } from '$lib/domain/countdown';
+	import { countdownFor, parseIsoDate, toIsoDate } from '$lib/domain/countdown';
+	import { decideAddProject } from '$lib/domain/wip';
 	import { app } from '$lib/stores/app.svelte';
 	import { toasts } from '$lib/stores/toasts.svelte';
 	import type { InboxItem } from '$lib/types';
@@ -27,12 +28,35 @@
 	const activeProjects = $derived(app.active);
 	const datePreview = $derived(manifestDate ? countdownFor(manifestDate, app.now) : null);
 
+	/*
+	 * Triage is a project-creation path too, and it used to be the one that crossed the
+	 * WIP cap in silence. The warning has to appear wherever the line can be crossed, or
+	 * the limit is only enforced on whichever route the user does not take.
+	 */
+	const projectDecision = $derived(decideAddProject(app.snapshot.projects, app.settings.wipLimit));
+	const wouldExceedWip = $derived(projectDecision.kind === 'warn');
+
+	/*
+	 * Seed the panel once per item, not on every snapshot.
+	 *
+	 * Depending on `item` meant any unrelated write — a capture in another tab, a task
+	 * completed elsewhere — re-emitted the snapshot with a fresh object and re-ran this,
+	 * silently reverting a date the user had just picked and erasing a half-typed project
+	 * name. Only the identity of the expanded item should reseed it.
+	 */
+	let seededFor = $state<string | null>(null);
+
 	$effect(() => {
-		if (expanded) {
-			manifestDate = item.parsedDate ?? '';
-			mode = item.parsedDate ? 'manifest' : 'none';
-			newProjectTitle = '';
+		if (!expanded) {
+			seededFor = null;
+			return;
 		}
+		if (seededFor === item.id) return;
+
+		seededFor = item.id;
+		manifestDate = item.parsedDate ?? '';
+		mode = item.parsedDate ? 'manifest' : 'none';
+		newProjectTitle = '';
 	});
 
 	async function fileTo(projectId: string, asNextAction: boolean) {
@@ -49,7 +73,9 @@
 	}
 
 	async function toManifest() {
-		if (!manifestDate) return;
+		// A native date input happily yields a five-digit year, which the manifest itself
+		// cannot read back. Validate with the same parser the board uses.
+		if (!manifestDate || !parseIsoDate(manifestDate)) return;
 		await app.repository.triageInboxItem(item.id, { kind: 'to-manifest', date: manifestDate });
 		toasts.show('Added to the manifest.');
 	}
@@ -171,7 +197,7 @@
 					<button
 						type="button"
 						class="btn btn-sm btn-primary"
-						disabled={!manifestDate}
+						disabled={!datePreview}
 						onclick={toManifest}
 						data-testid="triage-manifest-add"
 					>
@@ -184,6 +210,13 @@
 			{/if}
 
 			{#if mode === 'new-project'}
+				{#if wouldExceedWip}
+					<p class="wip-warning small" data-testid="triage-wip-warning">
+						<Icon name="info" size={14} />
+						Starting this makes it {projectDecision.status.activeCount + 1} active projects, and your
+						limit is {projectDecision.status.limit}.
+					</p>
+				{/if}
 				<div class="sub">
 					<input
 						class="input"
@@ -198,7 +231,7 @@
 						onclick={toNewProject}
 						data-testid="triage-new-project-create"
 					>
-						Start it
+						{wouldExceedWip ? 'Start it anyway' : 'Start it'}
 					</button>
 				</div>
 				<p class="small faint">
@@ -311,5 +344,15 @@
 		width: auto;
 		flex: 1;
 		min-width: 9rem;
+	}
+
+	.wip-warning {
+		display: flex;
+		align-items: flex-start;
+		gap: var(--space-2);
+		color: var(--stone-attention);
+		padding: var(--space-2) var(--space-3);
+		border-radius: var(--radius);
+		background: var(--stone-attention-soft);
 	}
 </style>

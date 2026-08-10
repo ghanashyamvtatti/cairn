@@ -484,15 +484,53 @@ describe('deleteProject', () => {
 
 		const project = await projectRow(doomed.id);
 		expect(project.deletedAt).toBe(at);
-		expect(project.nextActionId).toBeNull();
+		// The pointer and the flag are preserved on purpose so `restoreProject` can put
+		// the project back exactly as it was, next action and all. Nothing reads either
+		// field while the rows are tombstoned.
+		expect(project.nextActionId).toBe(live.id);
 		expect((await taskRow(live.id)).deletedAt).toBe(at);
-		expect((await taskRow(live.id)).isNextAction).toBe(false);
+		expect((await taskRow(live.id)).isNextAction).toBe(true);
 		expect((await taskRow(alsoLive.id)).deletedAt).toBe(at);
 		expect((await taskRow(untouched.id)).deletedAt).toBeNull();
 		expect((await projectRow(survivor.id)).deletedAt).toBeNull();
 
 		// Already-deleted rows keep their original tombstone rather than being re-stamped.
 		expect((await taskRow(alreadyGone.id)).deletedAt).toBe(deletedEarlier);
+	});
+
+	it('restoreProject puts back the project, its tasks and its next action', async () => {
+		const project = await repo.createProject('Rewire the shed');
+		const next = await repo.addTask({
+			projectId: project.id,
+			title: 'Buy the conduit',
+			asNextAction: true
+		});
+		const other = await repo.addTask({ projectId: project.id, title: 'Chase the sparky' });
+
+		const removedEarlier = tick();
+		await repo.deleteTask(other.id);
+
+		tick();
+		await repo.deleteProject(project.id);
+		tick();
+		await repo.restoreProject(project.id);
+
+		const restored = await projectRow(project.id);
+		expect(restored.deletedAt).toBeNull();
+		expect(restored.nextActionId).toBe(next.id);
+		expect((await taskRow(next.id)).deletedAt).toBeNull();
+		expect((await taskRow(next.id)).isNextAction).toBe(true);
+
+		// A task deleted BEFORE the project stays deleted — the restore undoes the
+		// cascade, not every removal that ever happened in the project.
+		expect((await taskRow(other.id)).deletedAt).toBe(removedEarlier);
+	});
+
+	it('restoreProject does nothing for a project that was never deleted', async () => {
+		const project = await repo.createProject('Rewire the shed');
+		await repo.restoreProject(project.id);
+
+		expect((await projectRow(project.id)).deletedAt).toBeNull();
 	});
 });
 

@@ -4,12 +4,28 @@
 	import NewProjectDialog from '$lib/components/NewProjectDialog.svelte';
 	import Nudges from '$lib/components/Nudges.svelte';
 	import ProjectCard from '$lib/components/ProjectCard.svelte';
-	import { overLimitMessage } from '$lib/domain/wip';
+	import { overLimitMessage, wipStatus } from '$lib/domain/wip';
+	import { toasts } from '$lib/stores/toasts.svelte';
 	import { formatWeekLabel } from '$lib/domain/week';
 	import { app } from '$lib/stores/app.svelte';
 	import { ui } from '$lib/stores/ui.svelte';
 
 	let newProjectOpen = $state(false);
+
+	/**
+	 * Reactivating is the third way to add to the active set, so it gets the same
+	 * treatment: the move goes through, and the consequence is stated plainly.
+	 */
+	async function reactivate(id: string) {
+		await app.repository.setProjectStatus(id, 'active');
+		const after = wipStatus(
+			app.snapshot.projects.map((p) => (p.id === id ? { ...p, status: 'active' as const } : p)),
+			app.settings.wipLimit
+		);
+		if (after.isOverLimit) {
+			toasts.show(overLimitMessage(after), { tone: 'attention' });
+		}
+	}
 
 	const weekLabel = $derived(app.currentWeek ? formatWeekLabel(app.currentWeek) : '');
 	const showParked = $derived(app.parked.length > 0);
@@ -108,7 +124,7 @@
 						<button
 							type="button"
 							class="btn btn-sm"
-							onclick={() => void app.repository.setProjectStatus(project.id, 'active')}
+							onclick={() => void reactivate(project.id)}
 							data-testid="unpark"
 						>
 							Reactivate

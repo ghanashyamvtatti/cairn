@@ -107,9 +107,27 @@
 			position: relative;
 		}
 
+		/*
+			Colour alone must not carry the "you are here" signal. On the tab bar the
+			current item also gets a weight change and a marker above the icon, so it reads
+			without colour vision and in a high-contrast mode that flattens the palette.
+		*/
 		.item.current {
 			background: transparent;
 			color: var(--stone-accent-text);
+			font-weight: 600;
+		}
+
+		.item.current::before {
+			content: '';
+			position: absolute;
+			top: 0;
+			left: 50%;
+			transform: translateX(-50%);
+			width: 1.25rem;
+			height: 2px;
+			border-radius: 0 0 2px 2px;
+			background: currentColor;
 		}
 
 		.count {

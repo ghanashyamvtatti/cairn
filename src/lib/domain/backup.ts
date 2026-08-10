@@ -95,16 +95,33 @@ function nullableNum(value: unknown): number | null {
 	return num(value);
 }
 
+/**
+ * A timestamp that means "this happened", where an unreadable value must NOT be read as
+ * "it did not".
+ *
+ * `deletedAt` and `completedAt` both carry that shape: coercing a corrupt value to
+ * `null` would silently resurrect a deleted row or reopen finished work. A present but
+ * unreadable value falls back to `now`, preserving the fact that it happened, and the
+ * caller records a warning.
+ */
+function nullableEventTime(value: unknown, now: Timestamp, onRepair: () => void): number | null {
+	if (value === null || value === undefined) return null;
+	const parsed = num(value);
+	if (parsed !== null) return parsed;
+	onRepair();
+	return now;
+}
+
 function bool(value: unknown, fallback: boolean): boolean {
 	return typeof value === 'boolean' ? value : fallback;
 }
 
 /** Every row needs the three tracking timestamps; missing ones default to `now`. */
-function tracked(row: Record<string, unknown>, now: Timestamp) {
+function tracked(row: Record<string, unknown>, now: Timestamp, onRepair: () => void) {
 	return {
 		createdAt: num(row.createdAt) ?? now,
 		updatedAt: num(row.updatedAt) ?? num(row.createdAt) ?? now,
-		deletedAt: nullableNum(row.deletedAt)
+		deletedAt: nullableEventTime(row.deletedAt, now, onRepair)
 	};
 }
 
@@ -114,7 +131,7 @@ const PROJECT_STATUSES: ProjectStatus[] = ['active', 'parked', 'done'];
 // Row validators. Each returns `null` to mean "drop this row".
 // ---------------------------------------------------------------------------
 
-function readProject(raw: unknown, now: Timestamp): Project | null {
+function readProject(raw: unknown, now: Timestamp, onRepair: () => void): Project | null {
 	if (!isObject(raw)) return null;
 	const id = nonEmptyStr(raw.id);
 	const title = str(raw.title);
@@ -130,11 +147,11 @@ function readProject(raw: unknown, now: Timestamp): Project | null {
 		status,
 		nextActionId: nonEmptyStr(raw.nextActionId),
 		order: num(raw.order) ?? 0,
-		...tracked(raw, now)
+		...tracked(raw, now, onRepair)
 	};
 }
 
-function readTask(raw: unknown, now: Timestamp): Task | null {
+function readTask(raw: unknown, now: Timestamp, onRepair: () => void): Task | null {
 	if (!isObject(raw)) return null;
 	const id = nonEmptyStr(raw.id);
 	const title = str(raw.title);
@@ -146,13 +163,13 @@ function readTask(raw: unknown, now: Timestamp): Task | null {
 		title,
 		notes: optionalStr(raw.notes),
 		isNextAction: bool(raw.isNextAction, false),
-		completedAt: nullableNum(raw.completedAt),
+		completedAt: nullableEventTime(raw.completedAt, now, onRepair),
 		weekId: nonEmptyStr(raw.weekId),
-		...tracked(raw, now)
+		...tracked(raw, now, onRepair)
 	};
 }
 
-function readInboxItem(raw: unknown, now: Timestamp): InboxItem | null {
+function readInboxItem(raw: unknown, now: Timestamp, onRepair: () => void): InboxItem | null {
 	if (!isObject(raw)) return null;
 	const id = nonEmptyStr(raw.id);
 	const text = str(raw.text);
@@ -164,11 +181,11 @@ function readInboxItem(raw: unknown, now: Timestamp): InboxItem | null {
 		id,
 		text,
 		parsedDate: parsedDate && parseIsoDate(parsedDate) ? parsedDate : undefined,
-		...tracked(raw, now)
+		...tracked(raw, now, onRepair)
 	};
 }
 
-function readFixedDate(raw: unknown, now: Timestamp): FixedDate | null {
+function readFixedDate(raw: unknown, now: Timestamp, onRepair: () => void): FixedDate | null {
 	if (!isObject(raw)) return null;
 	const id = nonEmptyStr(raw.id);
 	const title = str(raw.title);
@@ -182,11 +199,11 @@ function readFixedDate(raw: unknown, now: Timestamp): FixedDate | null {
 		title,
 		date,
 		note: optionalStr(raw.note),
-		...tracked(raw, now)
+		...tracked(raw, now, onRepair)
 	};
 }
 
-function readWeek(raw: unknown, now: Timestamp): Week | null {
+function readWeek(raw: unknown, now: Timestamp, onRepair: () => void): Week | null {
 	if (!isObject(raw)) return null;
 	const id = nonEmptyStr(raw.id);
 	if (!id) return null;
@@ -199,8 +216,8 @@ function readWeek(raw: unknown, now: Timestamp): Week | null {
 	return {
 		id,
 		startedAt: num(raw.startedAt) ?? now,
-		endedAt: nullableNum(raw.endedAt),
-		reviewCompletedAt: nullableNum(raw.reviewCompletedAt),
+		endedAt: nullableEventTime(raw.endedAt, now, onRepair),
+		reviewCompletedAt: nullableEventTime(raw.reviewCompletedAt, now, onRepair),
 		reviewSteps: steps
 	};
 }
@@ -244,7 +261,7 @@ function readSettings(raw: unknown): Partial<SettingsMap> {
 function readCollection<T>(
 	raw: unknown,
 	name: string,
-	read: (row: unknown, now: Timestamp) => T | null,
+	read: (row: unknown, now: Timestamp, onRepair: () => void) => T | null,
 	now: Timestamp,
 	warnings: string[]
 ): T[] {
@@ -255,14 +272,52 @@ function readCollection<T>(
 	}
 
 	const out: T[] = [];
+	const seen = new Set<string>();
 	let dropped = 0;
+	let duplicates = 0;
+	let repaired = 0;
+
 	for (const row of raw) {
-		const parsed = read(row, now);
-		if (parsed) out.push(parsed);
-		else dropped += 1;
+		const parsed = read(row, now, () => {
+			repaired += 1;
+		});
+		if (!parsed) {
+			dropped += 1;
+			continue;
+		}
+
+		/*
+		 * Drop repeated ids here rather than letting them reach the database.
+		 *
+		 * `bulkAdd` fails the whole transaction on a primary-key collision, so a single
+		 * duplicated id in a hand-edited file used to abort the entire restore with a raw
+		 * IndexedDB error. Losing one row and saying so is strictly better than losing
+		 * everything.
+		 */
+		const id = (parsed as { id?: string }).id;
+		if (typeof id === 'string') {
+			if (seen.has(id)) {
+				duplicates += 1;
+				continue;
+			}
+			seen.add(id);
+		}
+
+		out.push(parsed);
 	}
+
 	if (dropped > 0) {
 		warnings.push(`Skipped ${dropped} unreadable ${name} ${dropped === 1 ? 'entry' : 'entries'}.`);
+	}
+	if (duplicates > 0) {
+		warnings.push(
+			`Kept the first of ${duplicates + 1} ${name} entries that shared an id; the rest were dropped.`
+		);
+	}
+	if (repaired > 0) {
+		warnings.push(
+			`Repaired ${repaired} unreadable ${name} timestamp${repaired === 1 ? '' : 's'}. Anything marked as removed or finished stayed that way.`
+		);
 	}
 	return out;
 }
@@ -363,9 +418,30 @@ export function repairReferences(data: BackupData, warnings: string[]): BackupDa
 		const eligible = candidates.filter((t) => t.completedAt === null);
 		const pool = eligible.length > 0 ? eligible : candidates;
 
+		/*
+		 * The project's own pointer is the strongest signal of intent, so honour it even
+		 * when the task it names was never flagged — an older export, or a hand edit,
+		 * can easily set one without the other. Previously the pointer was silently
+		 * dropped and the project imported stalled.
+		 */
+		const pointedAt = project.nextActionId
+			? (data.tasks.find(
+					(t) =>
+						t.id === project.nextActionId &&
+						t.projectId === project.id &&
+						t.deletedAt === null &&
+						t.completedAt === null
+				) ?? null)
+			: null;
+
+		if (pointedAt && !pointedAt.isNextAction) {
+			pointedAt.isNextAction = true;
+			candidates.push(pointedAt);
+		}
+
 		// Prefer whatever the project already points at; otherwise the most recently
 		// updated flagged task wins.
-		let chosen = pool.find((t) => t.id === project.nextActionId) ?? null;
+		let chosen = pointedAt ?? pool.find((t) => t.id === project.nextActionId) ?? null;
 		if (!chosen && pool.length > 0) {
 			chosen = [...pool].sort((a, b) => b.updatedAt - a.updatedAt)[0];
 		}

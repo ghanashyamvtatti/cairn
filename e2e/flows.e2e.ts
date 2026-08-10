@@ -419,3 +419,240 @@ test.describe('keyboard and accessibility', () => {
 		await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#161513');
 	});
 });
+
+/**
+ * Regressions for defects found in adversarial review. Each one reproduced a real,
+ * user-reachable failure before the fix.
+ */
+test.describe('regressions', () => {
+	test('deleting a project can be undone, tasks and all', async ({ page }) => {
+		await createProject(page, 'Move the studio');
+		await setNextAction(page, 'Move the studio', 'Ring three removal firms');
+
+		const card = projectCard(page, 'Move the studio');
+		await card.getByTestId('project-disclosure').click();
+		await card.getByTestId('add-task-input').fill('Book the van');
+		await card.getByRole('button', { name: 'Add', exact: true }).click();
+
+		await card.getByTestId('project-options').click();
+		await page.locator('dialog[open]').getByTestId('project-delete').click();
+		await expect(page.getByTestId('empty-projects')).toBeVisible();
+
+		await page.getByTestId('toasts').getByRole('button', { name: 'Undo' }).click();
+
+		const restored = projectCard(page, 'Move the studio');
+		await expect(restored.getByTestId('next-action')).toContainText('Ring three removal firms');
+		await restored.getByTestId('project-disclosure').click();
+		await expect(restored).toContainText('Book the van');
+
+		const { tasks, projects } = await readDb(page);
+		expect(projects.every((p) => p.deletedAt === null)).toBe(true);
+		expect(tasks.every((t) => t.deletedAt === null)).toBe(true);
+	});
+
+	test('triage warns before it crosses the WIP limit, and still lets you through', async ({
+		page
+	}) => {
+		await createProject(page, 'Project one');
+		await createProject(page, 'Project two');
+		await createProject(page, 'Project three');
+		await capture(page, 'Redo the bathroom');
+
+		await page.getByTestId('nav-inbox').first().click();
+		await page.getByTestId('inbox-item-toggle').click();
+		await page.getByTestId('triage-new-project-open').click();
+
+		await expect(page.getByTestId('triage-wip-warning')).toContainText(
+			'makes it 4 active projects'
+		);
+		await expect(page.getByTestId('triage-new-project-create')).toHaveText('Start it anyway');
+
+		await page.getByTestId('triage-new-project-create').click();
+		await page.getByTestId('nav-projects').first().click();
+		await expect(page.getByTestId('wip-banner')).toContainText('4 active projects');
+	});
+
+	test('an open triage panel keeps its chosen date when something else writes', async ({
+		page
+	}) => {
+		await capture(page, 'Renew the insurance tomorrow');
+		await page.getByTestId('nav-inbox').first().click();
+		await page.getByTestId('inbox-item-toggle').click();
+
+		const dateField = page.getByTestId('triage-manifest-date');
+		await dateField.fill(localIsoDate(200));
+
+		// Any unrelated write re-emits the snapshot; the panel must not reseed from it.
+		await page.getByTestId('open-capture').click();
+		const dialog = page.locator('dialog[open]');
+		await dialog.getByTestId('capture-input').fill('Something unrelated');
+		await dialog.getByTestId('capture-submit').click();
+		await page.keyboard.press('Escape');
+
+		await expect(dateField).toHaveValue(localIsoDate(200));
+	});
+
+	test('the chosen theme survives a reload without being reset to system', async ({ page }) => {
+		await page.getByTestId('nav-settings').click();
+		await page.getByTestId('theme-dark').click();
+
+		await page.reload();
+		await expect(page.getByTestId('export')).toBeVisible();
+		// Still dark after the store has loaded, and the pre-paint hint is intact.
+		await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+		expect(await page.evaluate(() => localStorage.getItem('cairn.theme'))).toBe('dark');
+	});
+
+	test('a WIP limit typed out of range is clamped rather than displayed as a lie', async ({
+		page
+	}) => {
+		await page.getByTestId('nav-settings').click();
+		await page.getByTestId('wip-limit').fill('50');
+		await page.getByTestId('wip-limit').blur();
+
+		await expect(page.getByTestId('wip-limit')).toHaveValue('10');
+		const { projects } = await readDb(page);
+		expect(projects).toHaveLength(0);
+	});
+
+	test('a backup with a duplicated id restores what it can instead of failing entirely', async ({
+		page
+	}) => {
+		const now = Date.now();
+		const row = (id: string, title: string) => ({
+			id,
+			title,
+			status: 'active',
+			nextActionId: null,
+			order: 0,
+			createdAt: now,
+			updatedAt: now,
+			deletedAt: null
+		});
+
+		await page.getByTestId('nav-settings').click();
+		await page.getByTestId('import-input').setInputFiles({
+			name: 'dupes.json',
+			mimeType: 'application/json',
+			buffer: Buffer.from(
+				JSON.stringify({
+					format: 'cairn.backup',
+					version: 1,
+					exportedAt: now,
+					data: {
+						projects: [row('p1', 'Kept'), row('p1', 'Duplicate'), row('p2', 'Also kept')],
+						tasks: [],
+						inboxItems: [],
+						fixedDates: [],
+						weeks: [],
+						settings: {}
+					}
+				})
+			)
+		});
+
+		const dialog = page.locator('dialog[open]');
+		await expect(dialog).toContainText('shared an id');
+		await dialog.getByTestId('confirm-import').click();
+
+		await page.getByTestId('nav-projects').first().click();
+		await expect(page.getByTestId('project-card')).toHaveCount(2);
+		await expect(page.getByTestId('import-errors')).toHaveCount(0);
+	});
+
+	test('two rapid captures both land whole', async ({ page }) => {
+		await page.getByTestId('open-capture').click();
+		const dialog = page.locator('dialog[open]');
+		const field = dialog.getByTestId('capture-input');
+
+		// The field is cleared before the write is awaited, so a second thought typed
+		// straight after the first cannot be truncated by the first one's save landing.
+		await field.fill('First thought');
+		await field.press('Enter');
+		await field.fill('Second thought');
+		await field.press('Enter');
+
+		await expect(dialog.getByTestId('capture-added')).toContainText('First thought');
+		await expect(dialog.getByTestId('capture-added')).toContainText('Second thought');
+		await expect(field).toHaveValue('');
+
+		await page.keyboard.press('Escape');
+		const { inboxItems } = await readDb(page);
+		expect(inboxItems.map((i) => i.text).sort()).toEqual(['First thought', 'Second thought']);
+	});
+
+	test('restoring a backup leaves exactly one open week even if it carried two', async ({
+		page
+	}) => {
+		const now = Date.now();
+		await page.getByTestId('nav-settings').click();
+		await page.getByTestId('import-input').setInputFiles({
+			name: 'two-open-weeks.json',
+			mimeType: 'application/json',
+			buffer: Buffer.from(
+				JSON.stringify({
+					format: 'cairn.backup',
+					version: 1,
+					exportedAt: now,
+					data: {
+						projects: [],
+						tasks: [],
+						inboxItems: [],
+						fixedDates: [],
+						weeks: [
+							{
+								id: 'w1',
+								startedAt: now - 100000,
+								endedAt: null,
+								reviewCompletedAt: null,
+								reviewSteps: []
+							},
+							{
+								id: 'w2',
+								startedAt: now - 50000,
+								endedAt: null,
+								reviewCompletedAt: null,
+								reviewSteps: []
+							}
+						],
+						settings: {}
+					}
+				})
+			)
+		});
+		await page.locator('dialog[open]').getByTestId('confirm-import').click();
+		await expect(page.getByTestId('import-errors')).toHaveCount(0);
+
+		const { weeks } = await readDb(page);
+		expect(weeks.filter((w) => w.endedAt === null)).toHaveLength(1);
+	});
+
+	test('the manifest edit dialog explains itself instead of a dead Save button', async ({
+		page
+	}) => {
+		await page.getByTestId('nav-manifest').first().click();
+		await page.getByTestId('manifest-title').fill('Passport expires');
+		await page.getByTestId('manifest-date').fill(localIsoDate(20));
+		await page.getByTestId('manifest-add').click();
+
+		await page.getByTestId('manifest-row').getByRole('button').first().click();
+		const dialog = page.locator('dialog[open]');
+		await dialog.getByLabel('What is it?').fill('');
+		await dialog.getByRole('button', { name: 'Save' }).click();
+
+		await expect(dialog.getByTestId('manifest-save-error')).toBeVisible();
+		await expect(dialog).toBeVisible();
+	});
+
+	test('the current tab is not signalled by colour alone', async ({ page }) => {
+		await page.setViewportSize({ width: 375, height: 812 });
+		await page.goto('/manifest');
+
+		const weights = await page
+			.locator('.tabbar a')
+			.evaluateAll((els) => els.map((el) => getComputedStyle(el).fontWeight));
+
+		// Exactly one tab differs in weight, so the state survives without colour vision.
+		expect(new Set(weights).size).toBeGreaterThan(1);
+	});
+});

@@ -54,6 +54,8 @@ export default defineConfig({
 					'client/**/*.{js,css,ico,png,svg,webp,woff,woff2,webmanifest}',
 					'prerendered/**/*.{html,json}'
 				],
+				// Belt and braces alongside `includeVersionFile: false`.
+				globIgnores: ['server/**', '**/version.json'],
 				cleanupOutdatedCaches: true,
 				clientsClaim: true,
 				runtimeCaching: [
@@ -66,7 +68,13 @@ export default defineConfig({
 				]
 			},
 			kit: {
-				includeVersionFile: true
+				/*
+				 * Deliberately false. Precaching `_app/version.json` puts it behind a
+				 * precache route that wins over the `NetworkOnly` rule below, so the app
+				 * would keep reading the version it shipped with and could never notice a
+				 * new deployment.
+				 */
+				includeVersionFile: false
 			},
 			devOptions: {
 				enabled: false,

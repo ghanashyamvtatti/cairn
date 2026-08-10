@@ -82,12 +82,20 @@
 		const usable = parsed && parsed.raw === value && parsed.date ? parsed : null;
 		const text = usable?.title.trim() || raw;
 
+		/*
+		 * Clear BEFORE awaiting the write.
+		 *
+		 * Clearing afterwards wipes anything typed during the save — a brain dump is fast
+		 * enough that the first characters of the next thought routinely land inside that
+		 * window, and they were silently discarded.
+		 */
+		value = '';
+		parsed = null;
+		parsedFor = '';
+
 		busy = true;
 		try {
 			await app.repository.captureInboxItem(text, usable?.date ?? undefined);
-			value = '';
-			parsed = null;
-			parsedFor = '';
 			oncaptured?.(text);
 		} finally {
 			busy = false;

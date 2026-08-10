@@ -19,9 +19,21 @@
 
 	const done = $derived(task.completedAt !== null);
 
-	async function toggle() {
+	/**
+	 * The checkbox is driven by the stored task, not by its own DOM state.
+	 *
+	 * A native checkbox flips itself the instant it is clicked, so a write that fails
+	 * leaves a ticked box over an unchanged task — the single most misleading state this
+	 * screen can show. Re-asserting `checked` from the data afterwards makes the control
+	 * a view of what is saved rather than of what was clicked.
+	 */
+	async function toggle(event: Event) {
+		const input = event.currentTarget as HTMLInputElement;
+
 		if (done) await app.repository.reopenTask(task.id);
 		else await app.repository.completeTask(task.id);
+
+		input.checked = task.completedAt !== null;
 	}
 
 	async function promote() {

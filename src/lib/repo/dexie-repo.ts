@@ -11,6 +11,7 @@ import { parseIsoDate } from '$lib/domain/countdown';
 import { newId } from '$lib/domain/ids';
 import { toggleReviewStep } from '$lib/domain/review';
 import { planWeekReset, startWeek, type WeekResetSummary } from '$lib/domain/week';
+import { clampWipLimit } from '$lib/domain/wip';
 import {
 	DEFAULT_SETTINGS,
 	type FixedDate,
@@ -139,15 +140,44 @@ export class DexieRepository implements CairnRepository {
 	async deleteProject(id: Id): Promise<void> {
 		const now = this.now();
 		await this.db.transaction('rw', this.db.projects, this.db.tasks, async () => {
-			await this.db.projects.update(id, { deletedAt: now, updatedAt: now, nextActionId: null });
+			/*
+			 * Tombstone only. The next-action pointer and flag are deliberately preserved:
+			 * a soft delete has to be exactly reversible, and clearing them meant an undo
+			 * brought the project back stalled with its chosen next step forgotten. Nothing
+			 * reads either field while the rows are deleted, because every projection
+			 * filters tombstones out first.
+			 */
+			await this.db.projects.update(id, { deletedAt: now, updatedAt: now });
+
 			const tasks = await this.db.tasks.where('projectId').equals(id).toArray();
 			for (const task of tasks) {
 				if (task.deletedAt !== null) continue;
-				await this.db.tasks.update(task.id, {
-					deletedAt: now,
-					updatedAt: now,
-					isNextAction: false
-				});
+				await this.db.tasks.update(task.id, { deletedAt: now, updatedAt: now });
+			}
+		});
+	}
+
+	/**
+	 * Reverses `deleteProject`, including the tasks it cascaded over.
+	 *
+	 * The cascade stamps every task with the same instant as the project, so that
+	 * timestamp identifies exactly what the delete took — and nothing a later, unrelated
+	 * delete removed.
+	 */
+	async restoreProject(id: Id): Promise<void> {
+		const now = this.now();
+		await this.db.transaction('rw', this.db.projects, this.db.tasks, async () => {
+			const project = await this.db.projects.get(id);
+			if (!project || project.deletedAt === null) return;
+			const deletedAt = project.deletedAt;
+
+			await this.db.projects.update(id, { deletedAt: null, updatedAt: now });
+
+			const tasks = await this.db.tasks.where('projectId').equals(id).toArray();
+			for (const task of tasks) {
+				if (task.deletedAt === deletedAt) {
+					await this.db.tasks.update(task.id, { deletedAt: null, updatedAt: now });
+				}
 			}
 		});
 	}
@@ -295,8 +325,23 @@ export class DexieRepository implements CairnRepository {
 	}
 
 	async triageInboxItem(id: Id, action: TriageAction): Promise<void> {
-		const item = await this.db.inboxItems.get(id);
-		if (!item || item.deletedAt !== null) return;
+		/*
+		 * Claim the item first, in its own transaction.
+		 *
+		 * Reading it, acting on it and then deleting it is a read-check-act race: two
+		 * clicks in the same tick both saw a live item and both filed it, producing two
+		 * tasks — or two projects — from one thought. Tombstoning up front means the second
+		 * caller finds nothing to claim and does nothing.
+		 */
+		const item = await this.db.transaction('rw', this.db.inboxItems, async () => {
+			const row = await this.db.inboxItems.get(id);
+			if (!row || row.deletedAt !== null) return null;
+			const now = this.now();
+			await this.db.inboxItems.update(id, { deletedAt: now, updatedAt: now });
+			return row;
+		});
+
+		if (!item) return;
 
 		switch (action.kind) {
 			case 'delete':
@@ -332,8 +377,6 @@ export class DexieRepository implements CairnRepository {
 				await this.addFixedDate({ title: item.text, date: action.date });
 				break;
 		}
-
-		await this.deleteInboxItem(id);
 	}
 
 	// -----------------------------------------------------------------------
@@ -381,20 +424,31 @@ export class DexieRepository implements CairnRepository {
 	// -----------------------------------------------------------------------
 
 	async ensureCurrentWeek(): Promise<Week> {
-		const open = await this.db.weeks.filter((w) => w.endedAt === null).toArray();
-		if (open.length > 0) {
-			return open.sort((a, b) => b.startedAt - a.startedAt)[0];
-		}
+		// Read and create in ONE transaction. Split across two, a second tab opening the
+		// app at the same moment also sees "no open week" and adds its own, leaving two
+		// open weeks that no later reset can reconcile.
+		return this.db.transaction('rw', this.db.weeks, async () => {
+			const open = await this.db.weeks.filter((w) => w.endedAt === null).toArray();
+			if (open.length > 0) {
+				return open.sort((a, b) => b.startedAt - a.startedAt)[0];
+			}
 
-		const week = startWeek(newId(), this.now());
-		await this.db.weeks.add(week);
-		return week;
+			const week = startWeek(newId(), this.now());
+			await this.db.weeks.add(week);
+			return week;
+		});
 	}
 
 	async setReviewStep(step: ReviewStepId, done: boolean): Promise<void> {
-		const week = await this.ensureCurrentWeek();
-		await this.db.weeks.update(week.id, {
-			reviewSteps: toggleReviewStep(week.reviewSteps, step, done)
+		const { id } = await this.ensureCurrentWeek();
+		// Re-read inside the transaction: this is a read-modify-write on an array, and
+		// two ticks landing together would otherwise lose one.
+		await this.db.transaction('rw', this.db.weeks, async () => {
+			const current = await this.db.weeks.get(id);
+			if (!current) return;
+			await this.db.weeks.update(id, {
+				reviewSteps: toggleReviewStep(current.reviewSteps, step, done)
+			});
 		});
 	}
 
@@ -437,7 +491,10 @@ export class DexieRepository implements CairnRepository {
 	// -----------------------------------------------------------------------
 
 	async setSetting<K extends SettingKey>(key: K, value: SettingsMap[K]): Promise<void> {
-		await this.db.settings.put({ key, value } as Setting);
+		// Clamp here rather than at the input, so a number typed into Settings can never
+		// be stored and displayed as a limit the app is not actually enforcing.
+		const stored = key === 'wipLimit' ? clampWipLimit(value as number) : value;
+		await this.db.settings.put({ key, value: stored } as Setting);
 	}
 
 	// -----------------------------------------------------------------------
@@ -483,7 +540,16 @@ export class DexieRepository implements CairnRepository {
 			);
 		});
 
-		// An import with no open week would leave the app with nowhere to file new work.
+		// A backup can carry zero open weeks, or several. Exactly one must survive: close
+		// every extra, keeping the most recent, then create one if none remained.
+		await this.db.transaction('rw', this.db.weeks, async () => {
+			const open = (await this.db.weeks.filter((w) => w.endedAt === null).toArray()).sort(
+				(a, b) => b.startedAt - a.startedAt
+			);
+			for (const stale of open.slice(1)) {
+				await this.db.weeks.update(stale.id, { endedAt: this.now() });
+			}
+		});
 		await this.ensureCurrentWeek();
 
 		return {

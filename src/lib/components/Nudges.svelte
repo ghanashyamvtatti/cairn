@@ -36,8 +36,11 @@
 		!showEvictionRisk &&
 			!showInstall &&
 			!showPersist &&
+			!app.isEmpty &&
 			exportReminderIsDue(app.settings.lastExportAt, app.now)
 	);
+
+	const neverExported = $derived(app.settings.lastExportAt === null);
 
 	async function dismissInstall() {
 		await app.repository.setSetting('installNudgeDismissedAt', Date.now());
@@ -45,6 +48,11 @@
 
 	async function dismissPersist() {
 		await app.repository.setSetting('persistNudgeDismissedAt', Date.now());
+	}
+
+	/** Snoozes by pretending a backup just happened, which is also when to ask again. */
+	async function dismissExport() {
+		await app.repository.setSetting('lastExportAt', Date.now());
 	}
 
 	async function grantPersistence() {
@@ -76,7 +84,10 @@
 		<Icon name="download" size={18} />
 		<div>
 			<p class="title">Install Cairn</p>
-			<p class="small">It opens in its own window, works offline, and keeps its own storage.</p>
+			<p class="small">
+				It opens in its own window, launches straight from your home screen or dock, and works with
+				no connection at all.
+			</p>
 			<div class="actions">
 				<button
 					type="button"
@@ -110,10 +121,17 @@
 	<aside class="nudge" data-testid="nudge-export">
 		<Icon name="download" size={18} />
 		<div>
-			<p class="title">It has been a while since your last backup</p>
-			<p class="small">One file, saved wherever you like. It takes a second.</p>
+			<p class="title">
+				{neverExported
+					? 'You have not backed up yet'
+					: 'It has been a while since your last backup'}
+			</p>
+			<p class="small">
+				Everything is in this browser and nowhere else. One file, saved wherever you like.
+			</p>
 			<div class="actions">
 				<a href={resolve('/settings')} class="btn btn-sm">Export now</a>
+				<button type="button" class="btn btn-sm btn-quiet" onclick={dismissExport}>Not now</button>
 			</div>
 		</div>
 	</aside>

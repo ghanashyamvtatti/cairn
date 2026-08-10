@@ -122,7 +122,15 @@ export function nudgeIsDue(dismissedAt: number | null, now: number): boolean {
 	return now - dismissedAt > NUDGE_COOLDOWN_MS;
 }
 
+/**
+ * Whether to suggest a backup.
+ *
+ * A `null` last-export means the user has *never* backed up, which is the group with the
+ * most to lose — returning false for them, as an earlier version did, meant the only
+ * people who ever saw this prompt were the ones already in the habit. Callers gate on
+ * there being something worth backing up.
+ */
 export function exportReminderIsDue(lastExportAt: number | null, now: number): boolean {
-	if (lastExportAt === null) return false;
+	if (lastExportAt === null) return true;
 	return now - lastExportAt > EXPORT_REMINDER_MS;
 }

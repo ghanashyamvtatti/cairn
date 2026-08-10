@@ -78,9 +78,24 @@
 	}
 
 	async function remove() {
-		await app.repository.deleteProject(project.id);
+		const { id, title } = project;
+		const taskCount = app.tasksFor(id).length;
+
+		await app.repository.deleteProject(id);
 		settingsOpen = false;
-		toasts.show(`Deleted “${project.title}” and its tasks.`);
+		toasts.show(
+			taskCount > 0
+				? `Deleted “${title}” and ${taskCount} ${taskCount === 1 ? 'task' : 'tasks'}.`
+				: `Deleted “${title}”.`,
+			{
+				tone: 'attention',
+				// This takes more than any other action in the app, so it gets the longest
+				// window to change your mind. The rows are soft-deleted, so the restore is
+				// exact — the project and the tasks the cascade took with it.
+				ms: 12000,
+				action: { label: 'Undo', run: () => void app.repository.restoreProject(id) }
+			}
+		);
 	}
 </script>
 

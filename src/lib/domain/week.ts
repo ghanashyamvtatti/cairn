@@ -1,4 +1,3 @@
-import { format } from 'date-fns';
 import type { Id, Project, Task, Timestamp, Week } from '$lib/types';
 import { stalledProjects } from './wip';
 
@@ -111,9 +110,21 @@ export function planWeekReset(input: WeekResetInput): WeekResetPlan {
 	};
 }
 
-/** "Week of 10 Aug" — short enough for a header, unambiguous across months. */
+/**
+ * "Week of 10 Aug" — short enough for a header, unambiguous across months.
+ *
+ * `Intl.DateTimeFormat` rather than date-fns' `format`, which is the single heaviest
+ * thing date-fns pulls into the bundle and was being used for two short labels. The
+ * formatter is constructed once: building one is comparatively expensive and this is
+ * called on every render.
+ *
+ * The locale is pinned rather than taken from the browser so that day-then-month order
+ * is guaranteed — "10 Aug" cannot be misread, whereas a numeric 10/08 can.
+ */
+const weekLabelFormat = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' });
+
 export function formatWeekLabel(week: Pick<Week, 'startedAt'>): string {
-	return `Week of ${format(new Date(week.startedAt), 'd MMM')}`;
+	return `Week of ${weekLabelFormat.format(new Date(week.startedAt))}`;
 }
 
 /** Whole days the current week has been running. Used only for gentle prompting. */
