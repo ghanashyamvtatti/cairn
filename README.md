@@ -96,13 +96,14 @@ src/lib/domain    pure logic — countdowns, week reset, WIP, triage, backup. No
 src/lib/repo      the only code that touches Dexie. One swap point for future sync.
 src/lib/db        Dexie schema and migrations.
 src/lib/stores    Svelte 5 runes over one live snapshot.
-src/routes        five prerendered, client-rendered routes.
+src/routes        six prerendered, client-rendered routes.
 ```
 
 See [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md) for the schema and its invariants, and
 [`CLAUDE.md`](CLAUDE.md) for the architecture rules and the sharp edges worth knowing
 about.
 
-Tests: 1698 unit assertions run under Europe/London, America/Los_Angeles and
-Pacific/Chatham (a 45-minute offset that observes DST), plus 23 Playwright tests covering
-the core flows, offline behaviour, installability, and the export/import round trip.
+Tests: 1779 unit assertions run under Europe/London, America/Los_Angeles and
+Pacific/Chatham (a 45-minute offset that observes DST), plus 45 Playwright tests covering
+the core flows, onboarding, offline behaviour, installability, the export/import round
+trip, and what happens when a write fails.
