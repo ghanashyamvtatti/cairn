@@ -11,9 +11,10 @@ server, no telemetry. Everything lives in your browser; nothing is ever sent any
 Most task managers fail the same way: you miss a few days, come back to a wall of red
 overdue items, feel bad, and stop opening the app. Cairn is built so that cannot happen.
 
-- **A hard cap on what is running.** Three active projects by default. Start a fourth and
-  it tells you, offers to park one, and then gets out of the way — the limit is soft, but
-  going over it stays visible instead of being a dialog you clicked past.
+- **A limit on what is running.** Three active projects by default. Start a fourth and it
+  says so, offers to park one, and then gets out of your way. The limit is yours to break
+  — but going over it stays visible on the home screen instead of being a dialog you
+  clicked past once and forgot.
 - **Exactly one next action per project.** A project with none is _stalled_, and the flag
   is an input box, because the only useful response to "this is stalled" is deciding what
   moves it.
