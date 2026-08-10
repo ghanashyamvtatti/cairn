@@ -17,10 +17,26 @@ import { toIsoDate } from './countdown';
 type ChronoModule = typeof import('chrono-node');
 
 let chronoPromise: Promise<ChronoModule> | null = null;
+let chronoModule: ChronoModule | null = null;
 
 export function loadChrono(): Promise<ChronoModule> {
-	chronoPromise ??= import('chrono-node');
+	chronoPromise ??= import('chrono-node').then((module) => {
+		chronoModule = module;
+		return module;
+	});
 	return chronoPromise;
+}
+
+/**
+ * The parser if it is already in memory, otherwise `null`.
+ *
+ * Once the chunk has loaded, parsing is a synchronous millisecond, so submit can take a
+ * final look at exactly what was typed without awaiting anything. Without this, whether
+ * a date was recognised depended on whether the debounce happened to have fired — a fast
+ * typist would silently lose it.
+ */
+export function loadedChrono(): ChronoModule | null {
+	return chronoModule;
 }
 
 export interface CapturedText {

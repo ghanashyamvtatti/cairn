@@ -1,5 +1,10 @@
 <script lang="ts">
-	import { parseCapture, type CapturedText } from '$lib/domain/capture';
+	import {
+		loadedChrono,
+		parseCapture,
+		parseCaptureWith,
+		type CapturedText
+	} from '$lib/domain/capture';
 	import { countdownFor } from '$lib/domain/countdown';
 	import { app } from '$lib/stores/app.svelte';
 
@@ -24,7 +29,6 @@
 
 	let value = $state('');
 	let input = $state<HTMLInputElement | null>(null);
-	let busy = $state(false);
 
 	/**
 	 * The parse result, and the exact string it was computed from.
@@ -76,10 +80,30 @@
 		event.preventDefault();
 
 		const raw = value.trim();
-		if (raw === '' || busy) return;
+		/*
+		 * No in-flight guard.
+		 *
+		 * There used to be one, to stop a double submit of the same text — but the field is
+		 * now cleared synchronously below, so a repeat submit sees nothing and returns
+		 * anyway. Keeping the guard meant a second thought entered while the first was
+		 * still saving was silently dropped, which is precisely the burst a brain dump is.
+		 * Concurrent writes are fine; they carry different text.
+		 */
+		if (raw === '') return;
 
-		// Only trust a parse computed from exactly this string.
-		const usable = parsed && parsed.raw === value && parsed.date ? parsed : null;
+		/*
+		 * Take one last look at exactly what was typed.
+		 *
+		 * The background parse is debounced, so submitting quickly used to beat it and the
+		 * date was lost. Once chrono is in memory a parse is a synchronous millisecond, so
+		 * this costs nothing and makes recognition depend on the text rather than on
+		 * typing speed. Before the chunk has loaded there is simply no parser, and capture
+		 * still goes through with no date — which is the promise.
+		 */
+		const chrono = loadedChrono();
+		const fresh =
+			parsed?.raw === value ? parsed : chrono ? parseCaptureWith(chrono, value, app.now) : null;
+		const usable = fresh?.date ? fresh : null;
 		const text = usable?.title.trim() || raw;
 
 		/*
@@ -93,14 +117,9 @@
 		parsed = null;
 		parsedFor = '';
 
-		busy = true;
-		try {
-			await app.repository.captureInboxItem(text, usable?.date ?? undefined);
-			oncaptured?.(text);
-		} finally {
-			busy = false;
-			input?.focus();
-		}
+		input?.focus();
+		await app.repository.captureInboxItem(text, usable?.date ?? undefined);
+		oncaptured?.(text);
 	}
 </script>
 

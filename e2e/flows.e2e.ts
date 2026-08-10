@@ -43,7 +43,7 @@ test.describe('capture and triage', () => {
 	});
 
 	test('parses a date out of captured text and offers it to the manifest', async ({ page }) => {
-		await capture(page, 'Renew the studio insurance tomorrow');
+		await capture(page, 'Renew the studio insurance tomorrow', { expectDate: true });
 
 		await page.getByTestId('nav-inbox').first().click();
 		// The date phrase is lifted out of the text and kept as structured data.
@@ -369,7 +369,9 @@ test.describe('offline and installability', () => {
 test.describe('keyboard and accessibility', () => {
 	test('opens capture from anywhere with a single keystroke', async ({ page }) => {
 		await page.getByTestId('nav-manifest').first().click();
-		await page.locator('body').click();
+		// Click the heading, not `body`: a `body` click targets its centre, which lands on
+		// a real button on some screens and activates it.
+		await page.getByRole('heading', { name: 'Manifest' }).click();
 		await page.keyboard.press('c');
 
 		const dialog = page.locator('dialog[open]');
@@ -396,15 +398,17 @@ test.describe('keyboard and accessibility', () => {
 	});
 
 	test('navigates with the g chord', async ({ page }) => {
-		await page.locator('body').click();
+		await page.getByRole('heading', { name: 'This week' }).click();
+		expect(await page.evaluate(() => document.activeElement?.tagName)).toBe('BODY');
 
-		// `type` sends both keys in one round trip. Two separate `press` calls can drift
-		// past the chord window on a loaded machine, which would be a flaky test rather
-		// than a real defect.
-		await page.keyboard.type('gm');
+		// Two ordinary presses. The 1.5s chord window is generous even under load once
+		// the click is not activating a control.
+		await page.keyboard.press('g');
+		await page.keyboard.press('m');
 		await expect(page).toHaveURL(/\/manifest$/);
 
-		await page.keyboard.type('gi');
+		await page.keyboard.press('g');
+		await page.keyboard.press('i');
 		await expect(page).toHaveURL(/\/inbox$/);
 	});
 
@@ -475,7 +479,7 @@ test.describe('regressions', () => {
 	test('an open triage panel keeps its chosen date when something else writes', async ({
 		page
 	}) => {
-		await capture(page, 'Renew the insurance tomorrow');
+		await capture(page, 'Renew the insurance tomorrow', { expectDate: true });
 		await page.getByTestId('nav-inbox').first().click();
 		await page.getByTestId('inbox-item-toggle').click();
 
@@ -495,6 +499,9 @@ test.describe('regressions', () => {
 	test('the chosen theme survives a reload without being reset to system', async ({ page }) => {
 		await page.getByTestId('nav-settings').click();
 		await page.getByTestId('theme-dark').click();
+		// Wait for the choice to actually land before reloading, otherwise this races the
+		// write rather than testing what survives it.
+		await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
 
 		await page.reload();
 		await expect(page.getByTestId('export')).toBeVisible();

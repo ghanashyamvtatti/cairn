@@ -26,11 +26,19 @@ export async function resetApp(page: Page) {
 	await expect(page.getByRole('heading', { name: 'This week' })).toBeVisible();
 }
 
-/** Captures a thought through the global dialog, exactly as the `c` shortcut does. */
-export async function capture(page: Page, text: string) {
+/**
+ * Captures a thought through the global dialog, exactly as the `c` shortcut does.
+ *
+ * `expectDate` waits for the "reads as …" hint before submitting. Capture never blocks
+ * on the parser by design, so on the very first capture of a session — before the
+ * chrono chunk has loaded — a date may legitimately not be recognised. Specs that assert
+ * on the parsed date wait for the hint rather than racing the chunk.
+ */
+export async function capture(page: Page, text: string, options: { expectDate?: boolean } = {}) {
 	await page.getByTestId('open-capture').click();
 	const dialog = page.locator('dialog[open]');
 	await dialog.getByTestId('capture-input').fill(text);
+	if (options.expectDate) await expect(dialog.getByTestId('capture-hint')).toBeVisible();
 	await dialog.getByTestId('capture-submit').click();
 	await expect(dialog.getByTestId('capture-added')).toContainText(text.split(' ')[0]);
 	await page.keyboard.press('Escape');
