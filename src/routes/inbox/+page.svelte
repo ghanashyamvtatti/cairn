@@ -35,7 +35,12 @@
 </header>
 
 <div class="capture card">
-	<CaptureField autofocus />
+	<!--
+		No autofocus. Arriving here is as often about triaging as capturing, and stealing
+		focus into a text field on load both disables the keyboard shortcuts and is poor
+		practice for screen-reader users. Press `c` when you want the field.
+	-->
+	<CaptureField />
 </div>
 
 {#if !app.ready}

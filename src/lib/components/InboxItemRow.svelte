@@ -125,7 +125,9 @@
 			{/if}
 
 			<div class="group">
-				<p class="label">Or</p>
+				<!-- "Or" only makes sense as a second option. With no projects yet, this group
+				     is the whole choice, so it has to name itself. -->
+				<p class="label">{activeProjects.length > 0 ? 'Or' : 'Where does it go?'}</p>
 				<div class="chips">
 					<button
 						type="button"

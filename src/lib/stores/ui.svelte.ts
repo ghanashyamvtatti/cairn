@@ -27,8 +27,14 @@ const GOTO_TARGETS: Record<string, AppRoute> = {
 	s: ROUTES.settings
 };
 
-/** How long a `g` prefix stays armed before it is forgotten. */
-const CHORD_WINDOW_MS = 1200;
+/**
+ * How long a `g` prefix stays armed before it is forgotten.
+ *
+ * A second and a half rather than a snappier value: someone reaching for a two-key
+ * sequence they use once a week is slower than someone who has it in muscle memory, and
+ * the cost of waiting slightly too long is only that a stray letter does nothing.
+ */
+const CHORD_WINDOW_MS = 1500;
 
 function isTypingTarget(target: EventTarget | null): boolean {
 	if (!(target instanceof HTMLElement)) return false;

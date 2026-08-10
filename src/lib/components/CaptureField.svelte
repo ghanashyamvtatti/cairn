@@ -4,14 +4,23 @@
 	import { app } from '$lib/stores/app.svelte';
 
 	interface Props {
-		/** Focus on mount. Used when the field is the point of the screen. */
-		autofocus?: boolean;
+		/**
+		 * Takes focus whenever this flips to true.
+		 *
+		 * Deliberately a reactive prop driving an imperative `focus()` rather than the
+		 * `autofocus` attribute. This field lives inside a `<dialog>` that spends most of
+		 * its life closed, and a declarative `autofocus` on a hidden element gets deferred
+		 * by the browser and then honoured on the next interaction — quietly moving focus
+		 * into an invisible input, which swallows keystrokes and disables every
+		 * single-key shortcut in the app.
+		 */
+		focusWhen?: boolean;
 		placeholder?: string;
 		/** Called after each successful capture, with the text that was stored. */
 		oncaptured?: (text: string) => void;
 	}
 
-	let { autofocus = false, placeholder = 'What is on your mind?', oncaptured }: Props = $props();
+	let { focusWhen = false, placeholder = 'What is on your mind?', oncaptured }: Props = $props();
 
 	let value = $state('');
 	let input = $state<HTMLInputElement | null>(null);
@@ -31,6 +40,14 @@
 
 	let hint = $derived(parsed && parsed.raw === value && parsed.date ? parsed : null);
 	let hintCountdown = $derived(hint?.date ? countdownFor(hint.date, app.now) : null);
+
+	$effect(() => {
+		if (!focusWhen) return;
+		// One frame later, so the dialog has actually been shown and the element is
+		// focusable. Focusing a `display: none` input silently does nothing.
+		const frame = requestAnimationFrame(() => input?.focus());
+		return () => cancelAnimationFrame(frame);
+	});
 
 	$effect(() => {
 		const current = value;
@@ -80,11 +97,9 @@
 </script>
 
 <form onsubmit={submit} class="capture">
-	<!-- svelte-ignore a11y_autofocus -->
 	<input
 		bind:this={input}
 		bind:value
-		{autofocus}
 		{placeholder}
 		class="input"
 		type="text"

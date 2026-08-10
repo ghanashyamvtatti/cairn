@@ -138,23 +138,29 @@
 		</div>
 	{/if}
 
-	{#if openTasks.length > 0 || doneThisWeek.length > 0}
-		<button
-			type="button"
-			class="disclosure"
-			onclick={() => (showOthers = !showOthers)}
-			aria-expanded={showOthers}
-			data-testid="project-disclosure"
-		>
-			<span class="chevron" class:open={showOthers}><Icon name="chevron" size={14} /></span>
-			{#if openTasks.length > 0}
-				<span>{openTasks.length} waiting</span>
-			{/if}
-			{#if doneThisWeek.length > 0}
-				<span class="done-count">{doneThisWeek.length} done this week</span>
-			{/if}
-		</button>
-	{/if}
+	<!--
+		Always present, even with nothing behind it: the rest of the project is where a
+		thought goes when it is not the next action, and hiding the entrance until a task
+		already exists left no way to put the first one there.
+	-->
+	<button
+		type="button"
+		class="disclosure"
+		onclick={() => (showOthers = !showOthers)}
+		aria-expanded={showOthers}
+		data-testid="project-disclosure"
+	>
+		<span class="chevron" class:open={showOthers}><Icon name="chevron" size={14} /></span>
+		{#if openTasks.length > 0}
+			<span>{openTasks.length} waiting</span>
+		{/if}
+		{#if doneThisWeek.length > 0}
+			<span class="done-count">{doneThisWeek.length} done this week</span>
+		{/if}
+		{#if openTasks.length === 0 && doneThisWeek.length === 0}
+			<span>The rest of this project</span>
+		{/if}
+	</button>
 
 	{#if showOthers}
 		<div class="others">

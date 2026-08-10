@@ -18,9 +18,21 @@
 	import type { MotionPreference, ThemePreference } from '$lib/types';
 
 	let fileInput = $state<HTMLInputElement | null>(null);
-	let pendingImport = $state<{ data: BackupData; counts: BackupCounts; warnings: string[] } | null>(
-		null
-	);
+
+	/**
+	 * `$state.raw`, not `$state`, and this matters.
+	 *
+	 * Plain `$state` deep-proxies the value it holds, and IndexedDB stores rows with the
+	 * structured clone algorithm, which cannot clone a Proxy. Handing a proxied backup to
+	 * `importAll` throws `DataCloneError` and the whole restore fails. Nothing here ever
+	 * mutates the value in place — it is only ever replaced — so it needs no deep
+	 * reactivity anyway.
+	 */
+	let pendingImport = $state.raw<{
+		data: BackupData;
+		counts: BackupCounts;
+		warnings: string[];
+	} | null>(null);
 	let importErrors = $state<string[]>([]);
 	let confirmClearOpen = $state(false);
 
@@ -71,9 +83,20 @@
 
 	async function confirmImport() {
 		if (!pendingImport) return;
-		await app.repository.importAll(pendingImport.data);
-		pendingImport = null;
-		toasts.show('Backup restored.');
+
+		try {
+			await app.repository.importAll(pendingImport.data);
+			pendingImport = null;
+			toasts.show('Backup restored.');
+		} catch (error) {
+			// A restore that fails silently is the worst possible outcome for the one
+			// feature standing between the user and losing everything. Say so, and leave
+			// the existing data untouched.
+			pendingImport = null;
+			importErrors = [
+				`The restore did not finish: ${error instanceof Error ? error.message : String(error)}. Your existing data has not been changed.`
+			];
+		}
 	}
 
 	async function setWipLimit(event: Event) {

@@ -29,7 +29,7 @@
 	description="One thought per line. Press Enter to add another; Escape when your head is empty."
 	{onclose}
 >
-	<CaptureField autofocus oncaptured={(text) => (justAdded = [text, ...justAdded])} />
+	<CaptureField focusWhen={open} oncaptured={(text) => (justAdded = [text, ...justAdded])} />
 
 	{#if justAdded.length > 0}
 		<ul class="added" aria-live="polite" data-testid="capture-added">

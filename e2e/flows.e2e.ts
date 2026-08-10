@@ -1,0 +1,421 @@
+import { expect, test } from '@playwright/test';
+import {
+	capture,
+	createProject,
+	localIsoDate,
+	projectCard,
+	readDb,
+	resetApp,
+	setNextAction
+} from './helpers';
+
+/**
+ * The four critical flows, plus the two that protect against data loss.
+ *
+ * These are the paths where a regression would make the product wrong rather than
+ * merely ugly: capture and triage, the single next action, the countdown, the weekly
+ * reset, the WIP cap, and the export/import round trip.
+ */
+
+test.beforeEach(async ({ page }) => {
+	await resetApp(page);
+});
+
+test.describe('capture and triage', () => {
+	test('captures a thought in one field and files it as a project’s next action', async ({
+		page
+	}) => {
+		await createProject(page, 'Move the studio');
+		await capture(page, 'Ring three removal firms');
+
+		await page.getByTestId('nav-inbox').first().click();
+		await expect(page.getByTestId('inbox-count')).toContainText('1 item');
+
+		await page.getByTestId('inbox-item-toggle').click();
+		await page.getByTestId('triage-to-next-action').click();
+
+		await expect(page.getByTestId('empty-inbox')).toBeVisible();
+
+		await page.getByTestId('nav-projects').first().click();
+		const card = projectCard(page, 'Move the studio');
+		await expect(card.getByTestId('next-action')).toContainText('Ring three removal firms');
+		await expect(card.getByTestId('stalled')).toHaveCount(0);
+	});
+
+	test('parses a date out of captured text and offers it to the manifest', async ({ page }) => {
+		await capture(page, 'Renew the studio insurance tomorrow');
+
+		await page.getByTestId('nav-inbox').first().click();
+		// The date phrase is lifted out of the text and kept as structured data.
+		await expect(page.getByTestId('inbox-item')).toContainText('Renew the studio insurance');
+		await expect(page.getByTestId('inbox-item')).toContainText('Tomorrow');
+
+		await page.getByTestId('inbox-item-toggle').click();
+		// The parsed date pre-fills the picker rather than being applied silently.
+		await expect(page.getByTestId('triage-manifest-date')).toHaveValue(localIsoDate(1));
+		await page.getByTestId('triage-manifest-add').click();
+
+		await page.getByTestId('nav-manifest').first().click();
+		const row = page.getByTestId('manifest-row');
+		await expect(row).toContainText('Renew the studio insurance');
+		await expect(row).toContainText('Tomorrow');
+	});
+
+	test('does not invent a date for text that merely contains a number', async ({ page }) => {
+		await capture(page, 'Buy 5 apples');
+
+		await page.getByTestId('nav-inbox').first().click();
+		await expect(page.getByTestId('inbox-item')).toContainText('Buy 5 apples');
+
+		const { inboxItems } = await readDb(page);
+		expect(inboxItems).toHaveLength(1);
+		expect(inboxItems[0].parsedDate).toBeUndefined();
+	});
+
+	test('dropping an inbox item offers an undo', async ({ page }) => {
+		await capture(page, 'Something I do not actually need');
+		await page.getByTestId('nav-inbox').first().click();
+
+		await page.getByTestId('inbox-item-toggle').click();
+		await page.getByTestId('triage-delete').click();
+		await expect(page.getByTestId('empty-inbox')).toBeVisible();
+
+		await page.getByTestId('toasts').getByRole('button', { name: 'Undo' }).click();
+		await expect(page.getByTestId('inbox-item')).toContainText('Something I do not actually need');
+	});
+});
+
+test.describe('one next action per project', () => {
+	test('setting a new next action demotes the old one instead of losing it', async ({ page }) => {
+		await createProject(page, 'Fix the roof');
+		await setNextAction(page, 'Fix the roof', 'Photograph the flashing');
+
+		const card = projectCard(page, 'Fix the roof');
+		await card.getByTestId('project-disclosure').click();
+		await card.getByTestId('add-task-input').fill('Get a quote for the scaffolding');
+		await card.getByRole('button', { name: 'Add', exact: true }).click();
+
+		const later = card
+			.getByTestId('task-row')
+			.filter({ hasText: 'Get a quote for the scaffolding' });
+		await later.getByTestId('task-promote').click();
+
+		await expect(card.getByTestId('next-action')).toContainText('Get a quote for the scaffolding');
+
+		// The previous next action is still there, still open, just no longer flagged.
+		const { tasks } = await readDb(page);
+		const demoted = tasks.find((t) => t.title === 'Photograph the flashing');
+		expect(demoted).toMatchObject({ isNextAction: false, completedAt: null, deletedAt: null });
+		expect(tasks.filter((t) => t.isNextAction === true)).toHaveLength(1);
+	});
+
+	test('completing the next action leaves the project visibly stalled', async ({ page }) => {
+		await createProject(page, 'Get the tax return filed');
+		await setNextAction(page, 'Get the tax return filed', 'Dig out last year’s P60');
+
+		const card = projectCard(page, 'Get the tax return filed');
+		await card.getByTestId('next-action').getByTestId('task-complete').check();
+
+		await expect(card.getByTestId('stalled')).toBeVisible();
+		await expect(card.getByTestId('project-disclosure')).toContainText('1 done this week');
+	});
+
+	test('a stalled project is flagged without any red or overdue language', async ({ page }) => {
+		await createProject(page, 'Learn to make sourdough');
+
+		const stalled = projectCard(page, 'Learn to make sourdough').getByTestId('stalled');
+		await expect(stalled).toBeVisible();
+		await expect(stalled).not.toContainText(/overdue|late|failed/i);
+	});
+});
+
+test.describe('the manifest', () => {
+	test('shows a live countdown and refuses to let a date be completed', async ({ page }) => {
+		await page.getByTestId('nav-manifest').first().click();
+
+		await page.getByTestId('manifest-title').fill('Passport expires');
+		await page.getByTestId('manifest-date').fill(localIsoDate(12));
+		await page.getByTestId('manifest-add').click();
+
+		const row = page.getByTestId('manifest-row');
+		await expect(row).toContainText('in 12 days');
+		// "A calendar item is not a task": there is no completion control anywhere on it.
+		await expect(row.locator('input[type="checkbox"]')).toHaveCount(0);
+	});
+
+	test('today reads as Today, not as one day away or as passed', async ({ page }) => {
+		await page.getByTestId('nav-manifest').first().click();
+		await page.getByTestId('manifest-title').fill('Filing deadline');
+		await page.getByTestId('manifest-date').fill(localIsoDate(0));
+		await page.getByTestId('manifest-add').click();
+
+		await expect(page.getByTestId('manifest-upcoming')).toContainText('Today');
+		await expect(page.getByTestId('manifest-passed')).toHaveCount(0);
+	});
+
+	test('past dates move to a collapsed section rather than a pile of red', async ({ page }) => {
+		await page.getByTestId('nav-manifest').first().click();
+		await page.getByTestId('manifest-title').fill('Something that already happened');
+		await page.getByTestId('manifest-date').fill(localIsoDate(-3));
+		await page.getByTestId('manifest-add').click();
+
+		await expect(page.getByTestId('manifest-upcoming')).toHaveCount(0);
+		await expect(page.getByTestId('toggle-passed')).toContainText('1 passed');
+
+		await page.getByTestId('toggle-passed').click();
+		await expect(page.getByTestId('manifest-passed')).toContainText('3 days ago');
+	});
+});
+
+test.describe('the weekly reset', () => {
+	test('carries unfinished work forward and files what was finished', async ({ page }) => {
+		await createProject(page, 'Move the studio');
+		await setNextAction(page, 'Move the studio', 'Ring three removal firms');
+
+		const card = projectCard(page, 'Move the studio');
+		await card.getByTestId('project-disclosure').click();
+		await card.getByTestId('add-task-input').fill('Book the van');
+		await card.getByRole('button', { name: 'Add', exact: true }).click();
+
+		// Finish one of the two, leave the other running.
+		await card.getByTestId('next-action').getByTestId('task-complete').check();
+
+		await page.getByTestId('nav-review').first().click();
+		await page.getByTestId('start-new-week').click();
+		await page.getByTestId('confirm-new-week').click();
+
+		const summary = page.getByTestId('reset-summary');
+		await expect(summary).toContainText('1 carried forward, none of it late');
+		await expect(summary).toContainText('1 filed under the week you just closed');
+
+		const { tasks, weeks } = await readDb(page);
+		const current = weeks.find((w) => w.endedAt === null);
+		expect(weeks).toHaveLength(2);
+		expect(current).toBeDefined();
+
+		const carried = tasks.find((t) => t.title === 'Book the van');
+		const finished = tasks.find((t) => t.title === 'Ring three removal firms');
+
+		expect(carried?.weekId).toBe(current!.id);
+		expect(carried?.completedAt).toBeNull();
+		// Nothing was deleted and nothing acquired an overdue marker.
+		expect(tasks.every((t) => t.deletedAt === null)).toBe(true);
+		expect(finished?.weekId).not.toBe(current!.id);
+	});
+
+	test('review progress survives a reload mid-ritual', async ({ page }) => {
+		await page.getByTestId('nav-review').first().click();
+		await page.getByTestId('review-step').first().getByTestId('review-step-check').check();
+		await expect(page.getByTestId('review-progress')).toContainText('1 of 4 done');
+
+		await page.reload();
+		await expect(page.getByTestId('review-progress')).toContainText('1 of 4 done');
+	});
+
+	test('a new week can be started without finishing the checklist', async ({ page }) => {
+		await page.getByTestId('nav-review').first().click();
+		await expect(page.getByTestId('review-progress')).toContainText('0 of 4 done');
+
+		await page.getByTestId('start-new-week').click();
+		await page.getByTestId('confirm-new-week').click();
+
+		await expect(page.getByTestId('reset-summary')).toBeVisible();
+	});
+});
+
+test.describe('the WIP limit', () => {
+	test('warns at the limit, offers to park, and still lets you through', async ({ page }) => {
+		await createProject(page, 'Project one');
+		await createProject(page, 'Project two');
+		await createProject(page, 'Project three');
+
+		await expect(page.getByTestId('wip-banner')).toHaveCount(0);
+
+		await page.getByTestId('add-project').first().click();
+		const dialog = page.locator('dialog[open]');
+		await expect(dialog.getByTestId('wip-warning')).toContainText(
+			'You already have 3 active, and your limit is 3'
+		);
+		await expect(dialog.getByTestId('park-candidate')).toHaveCount(3);
+		await expect(dialog.getByTestId('new-project-submit')).toHaveText('Start it anyway');
+
+		await dialog.getByTestId('new-project-input').fill('Project four');
+		await dialog.getByTestId('new-project-submit').click();
+
+		// Going over is allowed, but it stays visible rather than being a dialog you clicked past.
+		await expect(page.getByTestId('project-card')).toHaveCount(4);
+		await expect(page.getByTestId('wip-banner')).toContainText(
+			'4 active projects, 3 is your limit'
+		);
+	});
+
+	test('parking a project clears the over-limit state without deleting anything', async ({
+		page
+	}) => {
+		await createProject(page, 'Project one');
+		await createProject(page, 'Project two');
+		await createProject(page, 'Project three');
+
+		const card = projectCard(page, 'Project one');
+		await card.getByTestId('project-options').click();
+		await page.locator('dialog[open]').getByTestId('project-park').click();
+
+		await expect(page.getByTestId('project-card')).toHaveCount(2);
+		await expect(page.getByRole('heading', { name: 'Parked' })).toBeVisible();
+
+		const { projects } = await readDb(page);
+		expect(projects).toHaveLength(3);
+		expect(projects.find((p) => p.title === 'Project one')).toMatchObject({
+			status: 'parked',
+			deletedAt: null
+		});
+	});
+});
+
+test.describe('export and import', () => {
+	test('exports a backup that restores the full state', async ({ page }) => {
+		await createProject(page, 'Move the studio');
+		await setNextAction(page, 'Move the studio', 'Ring three removal firms');
+		await capture(page, 'A loose thought');
+
+		await page.getByTestId('nav-manifest').first().click();
+		await page.getByTestId('manifest-title').fill('Passport expires');
+		await page.getByTestId('manifest-date').fill(localIsoDate(30));
+		await page.getByTestId('manifest-add').click();
+
+		await page.getByTestId('nav-settings').click();
+		const download = await Promise.all([
+			page.waitForEvent('download'),
+			page.getByTestId('export').click()
+		]).then(([event]) => event);
+
+		expect(download.suggestedFilename()).toMatch(/^cairn-\d{4}-\d{2}-\d{2}\.json$/);
+		const path = await download.path();
+		expect(path).toBeTruthy();
+
+		// Wipe everything, then restore from the file just written.
+		await page.getByTestId('clear-all').click();
+		await page.locator('dialog[open]').getByTestId('confirm-clear').click();
+		await page.getByTestId('nav-projects').first().click();
+		await expect(page.getByTestId('empty-projects')).toBeVisible();
+
+		await page.getByTestId('nav-settings').click();
+		await page.getByTestId('import-input').setInputFiles(path!);
+		await page.locator('dialog[open]').getByTestId('confirm-import').click();
+
+		await page.getByTestId('nav-projects').first().click();
+		const card = projectCard(page, 'Move the studio');
+		await expect(card.getByTestId('next-action')).toContainText('Ring three removal firms');
+
+		await page.getByTestId('nav-manifest').first().click();
+		await expect(page.getByTestId('manifest-row')).toContainText('Passport expires');
+
+		await page.getByTestId('nav-inbox').first().click();
+		await expect(page.getByTestId('inbox-item')).toContainText('A loose thought');
+	});
+
+	test('refuses a file that is not a Cairn backup, and says why', async ({ page }) => {
+		await page.getByTestId('nav-settings').click();
+		await page.getByTestId('import-input').setInputFiles({
+			name: 'not-a-backup.json',
+			mimeType: 'application/json',
+			buffer: Buffer.from(JSON.stringify({ format: 'something.else', version: 1, data: {} }))
+		});
+
+		await expect(page.getByTestId('import-errors')).toContainText('cairn.backup');
+		await expect(page.locator('dialog[open]')).toHaveCount(0);
+	});
+});
+
+test.describe('offline and installability', () => {
+	test('serves every route from the service worker with the network down', async ({
+		page,
+		context
+	}) => {
+		// Give the service worker a chance to finish precaching.
+		await page.waitForFunction(() => navigator.serviceWorker?.controller !== null, null, {
+			timeout: 15_000
+		});
+
+		await context.setOffline(true);
+		for (const path of ['/', '/manifest', '/inbox', '/review', '/settings']) {
+			await page.goto(path);
+			await expect(page.getByRole('link', { name: 'Cairn, home' })).toBeVisible();
+		}
+		await context.setOffline(false);
+	});
+
+	test('ships a web manifest that satisfies installability', async ({ page, request }) => {
+		const href = await page.locator('link[rel="manifest"]').getAttribute('href');
+		expect(href).toBeTruthy();
+
+		const response = await request.get(new URL(href!, page.url()).toString());
+		expect(response.ok()).toBe(true);
+
+		const manifest = await response.json();
+		expect(manifest.name).toBe('Cairn');
+		expect(manifest.display).toBe('standalone');
+		expect(manifest.start_url).toBeTruthy();
+
+		const sizes = manifest.icons.map((icon: { sizes: string }) => icon.sizes);
+		expect(sizes).toContain('192x192');
+		expect(sizes).toContain('512x512');
+		expect(manifest.icons.some((icon: { purpose?: string }) => icon.purpose === 'maskable')).toBe(
+			true
+		);
+	});
+});
+
+test.describe('keyboard and accessibility', () => {
+	test('opens capture from anywhere with a single keystroke', async ({ page }) => {
+		await page.getByTestId('nav-manifest').first().click();
+		await page.locator('body').click();
+		await page.keyboard.press('c');
+
+		const dialog = page.locator('dialog[open]');
+		await expect(dialog).toBeVisible();
+		await expect(dialog.getByTestId('capture-input')).toBeFocused();
+
+		await page.keyboard.press('Escape');
+		await expect(page.locator('dialog[open]')).toHaveCount(0);
+	});
+
+	test('does not fire shortcuts while you are typing', async ({ page }) => {
+		await page.getByTestId('nav-inbox').first().click();
+
+		// Scoped to `main`: the global capture dialog lives outside it and carries an
+		// identically-named field.
+		const field = page.locator('main').getByTestId('capture-input');
+		await field.click();
+		await page.keyboard.type('collect the cargo');
+
+		// 'c', 'g' and '?' all appear in that text; none may hijack the keystroke.
+		await expect(field).toHaveValue('collect the cargo');
+		await expect(page.locator('dialog[open]')).toHaveCount(0);
+		await expect(page).toHaveURL(/\/inbox$/);
+	});
+
+	test('navigates with the g chord', async ({ page }) => {
+		await page.locator('body').click();
+
+		// `type` sends both keys in one round trip. Two separate `press` calls can drift
+		// past the chord window on a loaded machine, which would be a flaky test rather
+		// than a real defect.
+		await page.keyboard.type('gm');
+		await expect(page).toHaveURL(/\/manifest$/);
+
+		await page.keyboard.type('gi');
+		await expect(page).toHaveURL(/\/inbox$/);
+	});
+
+	test('honours a dark theme choice across a reload without flashing', async ({ page }) => {
+		await page.getByTestId('nav-settings').click();
+		await page.getByTestId('theme-dark').click();
+		await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+
+		await page.reload();
+		// The inline head script applies it before paint, so it is set immediately.
+		await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+		await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#161513');
+	});
+});
