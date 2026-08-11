@@ -69,30 +69,39 @@ app says so too, at the point where it matters.
 Static output, so anything that serves files will do. No environment variables, no
 server, no bindings, no secrets.
 
-**Cloudflare Pages, from the dashboard (recommended).** Create a Pages project, connect
-this repository, and set:
+**Cloudflare Pages, from the dashboard.** Connect this repository and set:
 
-- Build command: `npm run build`
-- Build output directory: `build`
-- Deploy command: `npx wrangler pages deploy` — or leave it empty
+| Setting                | Value           |
+| ---------------------- | --------------- |
+| Framework preset       | None            |
+| Build command          | `npm run build` |
+| Build output directory | `build`         |
+| Root directory         | (blank)         |
 
-Every push to `main` then deploys itself.
+Leave any deploy command empty. Pages uploads `build/` itself using its own credentials,
+so nothing else is needed and every push to `main` deploys itself.
 
-If a deploy command field exists and Cloudflare has pre-filled it with `npx wrangler
-deploy`, change it. That is the _Workers_ command; it needs a Worker entrypoint, which a
-static site does not have, so it fails with "Missing entry-point" immediately after a
-build that succeeded — which reads like a build failure and is not one.
+Framework preset stays **None**: the SvelteKit preset assumes `adapter-cloudflare`, and
+this is a pure static build via `adapter-static`.
 
-**Cloudflare Pages, from the CLI.** `wrangler.jsonc` already points at `build/`, so:
+**There is deliberately no `wrangler.jsonc` in this repo.** Cloudflare's build system
+reads the presence of one as "this project deploys itself with wrangler" and fills in a
+deploy command, which then needs an API token the build container does not necessarily
+hold. The result is `Authentication error [code: 10000]` against `/pages/projects/...`
+immediately after a build that succeeded — an error that reads like a login problem and
+is really a wrong-tool problem. Without the file, Pages simply uploads the directory.
+
+Vite 8 also needs Node >= 20.19. `.nvmrc` pins 22; without it the build fails on a syntax
+error that says nothing about versions.
+
+**From your own machine**, if you would rather not wire up Git:
 
 ```bash
-npm run build && npx wrangler pages deploy
+npm run build && npx wrangler pages deploy build --project-name=cairn
 ```
 
-This needs an API token with the **Cloudflare Pages → Edit** permission. A token with
-only account-read scope authenticates successfully and then fails the deploy with
-`Authentication error [code: 10000]`, which is easy to misread as a login problem — add
-the Pages permission at
+That path does need a token with **Cloudflare Pages -> Edit**. A token with only
+account-read scope authenticates fine and then fails the deploy — check it at
 [dash.cloudflare.com/profile/api-tokens](https://dash.cloudflare.com/profile/api-tokens).
 
 ## How it is built
