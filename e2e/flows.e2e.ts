@@ -628,6 +628,10 @@ test.describe('regressions', () => {
 			)
 		});
 		await page.locator('dialog[open]').getByTestId('confirm-import').click();
+		// Wait for the confirmation, not merely for the absence of an error: the week
+		// reconciliation and the sync round trip both happen after the dialog closes, and
+		// reading the database before then catches a half-applied import.
+		await expect(page.getByTestId('toasts')).toContainText('Backup restored');
 		await expect(page.getByTestId('import-errors')).toHaveCount(0);
 
 		const { weeks } = await readDb(page);
@@ -654,6 +658,9 @@ test.describe('regressions', () => {
 	test('the current tab is not signalled by colour alone', async ({ page }) => {
 		await page.setViewportSize({ width: 375, height: 812 });
 		await page.goto('/manifest');
+		// The tab bar only exists inside the signed-in shell, which renders after the
+		// session resolves — evaluating before that measures an empty list.
+		await expect(page.locator('.tabbar a').first()).toBeVisible({ timeout: 15_000 });
 
 		const weights = await page
 			.locator('.tabbar a')

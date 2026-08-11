@@ -3,8 +3,9 @@
 **Three projects. One next action each. A board of hard deadlines. A place to dump your
 brain. One fifteen-minute review to reset the week.**
 
-A calm, private, local-first task manager for people juggling too much. No account, no
-server, no telemetry. Everything lives in your browser; nothing is ever sent anywhere.
+A calm, private task manager for people juggling too much. One account keeps your laptop
+and your phone showing the same thing; a copy stays in the browser so it opens instantly
+and still works offline. No analytics, no telemetry, nothing shared or sold.
 
 ## The opinion
 
@@ -43,26 +44,35 @@ npm install
 npm run dev
 ```
 
-| command             | what it does                                |
-| ------------------- | ------------------------------------------- |
-| `npm run dev`       | dev server on :5173                         |
-| `npm run build`     | static site to `build/`                     |
-| `npm run preview`   | serve the production build                  |
-| `npm run test:unit` | Vitest, run under three timezones           |
-| `npm run test:e2e`  | Playwright against the production build     |
-| `npm run check`     | svelte-check                                |
-| `npm run lint`      | prettier + eslint                           |
-| `npm run icons`     | regenerate PWA icons from `assets/icon.svg` |
+| command              | what it does                                           |
+| -------------------- | ------------------------------------------------------ |
+| `npm run dev`        | dev server on :5173                                    |
+| `npm run build`      | static site to `build/`                                |
+| `npm run preview`    | serve the production build                             |
+| `npm run test:unit`  | Vitest, run under three timezones                      |
+| `npm run test:e2e`   | Playwright against the production build                |
+| `npm run check`      | svelte-check                                           |
+| `npm run lint`       | prettier + eslint                                      |
+| `npm run icons`      | regenerate PWA icons from `assets/icon.svg`            |
+| `npm run dev:worker` | run the real Worker with D1 (needed for auth and sync) |
+| `npm run db:local`   | apply D1 migrations locally                            |
+| `npm run db:remote`  | apply D1 migrations to the deployed database           |
 
 ## Your data
 
-It is in this browser's IndexedDB and nowhere else. That is the point, and it is also the
-risk, so **export a backup** from Settings: one JSON file, written entirely client-side.
+In Cloudflare D1 under your account, so your devices agree, plus a cache in each browser's
+IndexedDB so the app opens instantly and stays readable offline.
 
-On iPhone and iPad this matters more than usual. Safari clears a website's storage after
-seven days without a visit. Web apps added to the Home Screen are not part of Safari and
-are exempt from that timer — so if you use Cairn on iOS, add it to your Home Screen. The
-app says so too, at the point where it matters.
+**The server is the arbiter and writes need a connection** — except capture, which is
+append-only and therefore cannot conflict, so it queues offline and flushes on reconnect.
+That is the whole consistency model: one place decides the order of events, so no merge
+algorithm can be wrong. See [`docs/SYNC.md`](docs/SYNC.md).
+
+There is no password reset yet, so **export a backup** from Settings now and then. It is
+the only copy that survives losing access to the account.
+
+Adding Cairn to your Home Screen or dock is still worth it — on iOS it exempts the offline
+cache from Safari's seven-day storage eviction.
 
 ## Deploying
 
@@ -107,11 +117,14 @@ account-read scope authenticates fine and then fails the deploy — check it at
 ## How it is built
 
 ```
-src/lib/domain    pure logic — countdowns, week reset, WIP, triage, backup. No DB imports.
-src/lib/repo      the only code that touches Dexie. One swap point for future sync.
+src/lib/domain    pure logic — countdowns, week reset, WIP, triage, backup, credentials.
+src/lib/repo      the only code that touches Dexie; SyncingRepository wraps DexieRepository.
+src/lib/sync      the wire protocol, the HTTP client, and the snapshot diff.
+src/lib/server    D1 access, password hashing, sessions. Never imported by client code.
 src/lib/db        Dexie schema and migrations.
 src/lib/stores    Svelte 5 runes over one live snapshot.
-src/routes        six prerendered, client-rendered routes.
+src/routes        six prerendered pages plus /api for auth and sync.
+migrations        D1 schema.
 ```
 
 See [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md) for the schema and its invariants, and

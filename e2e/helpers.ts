@@ -56,6 +56,9 @@ export async function resetApp(page: Page, options: { keepWelcome?: boolean } = 
 			request.onblocked = () => resolve();
 		});
 	});
+	// End any session the previous spec left behind. Clearing storage is not enough now
+	// that the session lives in an httpOnly cookie the page cannot touch.
+	await page.evaluate(() => fetch('/api/auth/sign-out', { method: 'POST' }).catch(() => undefined));
 	await page.reload();
 
 	await expect(page.getByTestId('auth-submit')).toBeVisible({ timeout: 15_000 });

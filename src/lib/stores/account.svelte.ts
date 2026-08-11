@@ -68,10 +68,16 @@ class AccountStore {
 
 		try {
 			this.account = await syncClient.session();
+			if (this.account) await this.repo?.rememberAccount(this.account.id, this.account.email);
 		} catch {
-			// Offline at start-up. Whatever is cached locally is still worth showing, and a
-			// reconnect will settle it.
-			this.account = null;
+			/*
+			 * The server is unreachable. Fall back to the account this device last used, so
+			 * an offline launch opens the app over its cached data instead of demanding a
+			 * sign-in it cannot possibly complete. Nothing is trusted from this: every
+			 * request still carries the real cookie, and the server still decides.
+			 */
+			this.account = (await this.repo?.cachedAccount()) ?? null;
+			this.status = { state: 'offline' };
 		}
 		this.resolved = true;
 
@@ -129,6 +135,7 @@ class AccountStore {
 		this.hydrated = false;
 		this.freshAccount = false;
 		this.account = account;
+		await this.repo.rememberAccount(account.id, account.email);
 		try {
 			await this.repo.pull();
 			await this.assessAccount();

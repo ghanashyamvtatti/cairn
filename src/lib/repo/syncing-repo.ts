@@ -83,6 +83,25 @@ export class SyncingRepository implements CairnRepository {
 	 * bleed into the new one, and a cursor from another account's sequence would silently
 	 * skip real data.
 	 */
+	/**
+	 * Remembers who this device belongs to, locally.
+	 *
+	 * The session cookie is httpOnly and the server is the only thing that can read it —
+	 * which is fine until the server is unreachable. Without a local note of the account,
+	 * opening the app on a train shows the sign-in screen over a database full of the
+	 * user's own cached work.
+	 */
+	async rememberAccount(id: string, email: string): Promise<void> {
+		await this.db.meta.put({ key: 'accountId', value: `${id}\u0000${email}` });
+	}
+
+	async cachedAccount(): Promise<{ id: string; email: string } | null> {
+		const row = await this.db.meta.get('accountId');
+		if (typeof row?.value !== 'string') return null;
+		const [id, email] = row.value.split('\u0000');
+		return id && email ? { id, email } : null;
+	}
+
 	async resetLocal(): Promise<void> {
 		await this.local.clearAll();
 		await this.db.meta.clear();

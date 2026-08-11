@@ -5,9 +5,10 @@ of hard deadlines. A place to dump your brain. One fifteen-minute review to rese
 
 ## Stack
 
-SvelteKit 2 (Svelte 5 runes) · TypeScript · `adapter-static` · Dexie (IndexedDB) ·
-`@vite-pwa/sveltekit` (Workbox) · date-fns · chrono-node · Vitest · Playwright.
-Deployed as static files to Cloudflare Pages.
+SvelteKit 2 (Svelte 5 runes) · TypeScript · `adapter-cloudflare` · Dexie (IndexedDB) ·
+Cloudflare D1 · `@vite-pwa/sveltekit` (Workbox) · date-fns · chrono-node · Vitest ·
+Playwright. Deployed to Cloudflare Pages; pages are prerendered static files and only
+`/api` reaches the Worker.
 
 There is no `svelte.config.js` — SvelteKit config lives inline in `sveltekit()` inside
 `vite.config.ts`.
@@ -37,14 +38,23 @@ reduce or increase overwhelm?** If it increases it, it is a non-goal.
 
 - Business logic lives in `src/lib/domain` as **pure functions** with no DB imports, unit
   tested without a database.
-- `src/lib/repo` is the **only** thing that touches Dexie. It is the single swap point
-  for a future sync layer.
+- `src/lib/repo` is the **only** thing that touches Dexie. `SyncingRepository` wraps
+  `DexieRepository` and implements the same interface, which is why adding sync changed
+  no route and no component.
+- **The server decides; IndexedDB remembers.** Reads come from the local cache so the app
+  opens instantly and works offline. Writes go to D1 and only survive locally if it
+  accepted them. Capture is the sole exception: inbox items are appends, so they queue
+  offline and flush on reconnect.
+- A write is _computed_ by running it against the local database, then the moved rows are
+  diffed out and pushed. A new repository method therefore needs no new sync code.
 - Every entity has a string UUID `id` plus `createdAt` / `updatedAt` / `deletedAt`. Never
   hard-delete; never use auto-increment keys. This is what lets sync drop in later.
 - Countdowns are **computed at render, never stored**.
 - Time is an argument, not an ambient global: domain functions take `now`, and the store
   exposes a reactive `app.now` that advances at local midnight.
-- No analytics, no telemetry, no network calls, no account.
+- No analytics and no telemetry. The app talks to its own API and nothing else.
+- Invariants that must hold across devices live in SQL as partial unique indexes, not
+  only in a Dexie transaction — one writer's transaction cannot constrain another's.
 - The linter and formatter are the source of truth for style.
 
 ## Things that will bite you
@@ -68,6 +78,16 @@ reduce or increase overwhelm?** If it increases it, it is a non-goal.
   only where the toast is the whole response.
 - `clientsClaim: true` is load-bearing. Without it the first page load is uncontrolled
   and installing then going offline gives a blank app.
+- **`platform.env` throws during prerendering**, and optional chaining does not help
+  because the access itself is the error. `hooks.server.ts` guards with `building`.
+- **`@cloudflare/workers-types` must not be referenced globally.** It replaces the DOM
+  lib, and client code loses `document`. Import `D1Database` inline instead.
+- **SQLite checks unique indexes per statement, not at commit.** Moving a next action
+  must write the demotion before the promotion, or the index sees two flagged tasks.
+- **Never key UI off "the app looks empty" while signing in.** The cache is wiped before
+  the pull, so anything reactive catches that gap — that is how the first-run welcome
+  kept appearing on second devices, and being modal it made the page inert.
+- Anything that dismisses a modal must not await a network write first.
 
 ## Onboarding
 

@@ -186,6 +186,12 @@
 		quietly disagree.
 	</p>
 	<p>
+		<strong>Add Cairn to your Home Screen or dock.</strong> It opens in its own window, and on iPhone
+		and iPad it also protects the offline copy: Safari clears an ordinary website's stored data after
+		seven days without a visit, and web apps on the Home Screen are exempt. Your work is safe on the server
+		either way — this is about the app still opening with no connection.
+	</p>
+	<p>
 		There is no analytics and no telemetry, and nothing is shared or sold. But your data is readable
 		by whoever runs the server, so it is a matter of trust rather than mathematics.
 		<strong>Export a backup from <a href={resolve('/settings')}>Settings</a></strong> now and then — it
