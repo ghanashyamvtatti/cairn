@@ -1,0 +1,24 @@
+{
+	// Cairn now has a server side: SvelteKit server routes for auth and sync, running on
+	// Cloudflare with D1 behind them. Pages still serves every prerendered page as a
+	// static file and only invokes the Worker for /api.
+	//
+	// Local development against a real local D1:
+	//   npx wrangler d1 create cairn        (once, then paste database_id below)
+	//   npx wrangler d1 migrations apply cairn --local
+	//   npx wrangler d1 migrations apply cairn --remote
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "cairn",
+	"compatibility_date": "2026-08-10",
+	"compatibility_flags": ["nodejs_compat"],
+	"pages_build_output_dir": ".svelte-kit/cloudflare",
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "cairn",
+			// Replace with the id printed by `wrangler d1 create cairn`.
+			"database_id": "REPLACE_WITH_D1_DATABASE_ID",
+			"migrations_dir": "migrations"
+		}
+	]
+}

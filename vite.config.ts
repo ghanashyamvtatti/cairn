@@ -1,6 +1,6 @@
 import { SvelteKitPWA } from '@vite-pwa/sveltekit';
 import { sveltekit } from '@sveltejs/kit/vite';
-import adapter from '@sveltejs/adapter-static';
+import adapter from '@sveltejs/adapter-cloudflare';
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
@@ -11,7 +11,12 @@ export default defineConfig({
 				runes: ({ filename }) =>
 					filename.split(/[/\\]/).includes('node_modules') ? undefined : true
 			},
-			adapter: adapter()
+			adapter: adapter({
+				// Pages serves the prerendered files directly and only invokes the Worker for
+				// what is left — the /api routes. Everything the service worker precaches is
+				// still a real file on disk.
+				routes: { include: ['/*'], exclude: ['<build>', '<prerendered>', '<files>'] }
+			})
 		}),
 		SvelteKitPWA({
 			// The update prompt is explicit rather than automatic: a reload that swallows a

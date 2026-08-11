@@ -5,11 +5,21 @@
 // See https://svelte.dev/docs/kit/types#app.d.ts
 declare global {
 	namespace App {
-		// interface Error {}
-		// interface Locals {}
-		// interface PageData {}
-		// interface PageState {}
-		// interface Platform {}
+		interface Locals {
+			/** Set by hooks.server.ts when the request carries a valid session cookie. */
+			account: { id: string; email: string } | null;
+		}
+
+		interface Platform {
+			env: {
+				/**
+				 * Imported inline rather than via a global `/// <reference>`: referencing
+				 * `@cloudflare/workers-types` globally replaces the DOM lib, and the client
+				 * code then loses `document`, `HTMLElement` and the rest.
+				 */
+				DB: import('@cloudflare/workers-types').D1Database;
+			};
+		}
 	}
 
 	interface Navigator {
