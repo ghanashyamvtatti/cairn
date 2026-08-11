@@ -48,5 +48,8 @@
 		"chrono-node": "^2.10.1",
 		"date-fns": "^4.4.0",
 		"dexie": "^4.4.4"
+	},
+	"engines": {
+		"node": ">=20.19"
 	}
 }
