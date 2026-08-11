@@ -28,3 +28,6 @@ test-results
 playwright-report
 blob-report
 /test-results/
+
+# Wrangler local state
+.wrangler
