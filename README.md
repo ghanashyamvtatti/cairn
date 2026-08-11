@@ -47,7 +47,7 @@ npm run dev
 | command              | what it does                                           |
 | -------------------- | ------------------------------------------------------ |
 | `npm run dev`        | dev server on :5173                                    |
-| `npm run build`      | static site to `build/`                                |
+| `npm run build`      | production build to `.svelte-kit/cloudflare/`          |
 | `npm run preview`    | serve the production build                             |
 | `npm run test:unit`  | Vitest, run under three timezones                      |
 | `npm run test:e2e`   | Playwright against the production build                |
@@ -76,43 +76,67 @@ cache from Safari's seven-day storage eviction.
 
 ## Deploying
 
-Static output, so anything that serves files will do. No environment variables, no
-server, no bindings, no secrets.
+Cloudflare Pages plus one D1 database. Every page is still a prerendered static file —
+`_routes.json` excludes all six of them — so the Worker only ever wakes for `/api`.
 
-**Cloudflare Pages, from the dashboard.** Connect this repository and set:
-
-| Setting                | Value           |
-| ---------------------- | --------------- |
-| Framework preset       | None            |
-| Build command          | `npm run build` |
-| Build output directory | `build`         |
-| Root directory         | (blank)         |
-
-Leave any deploy command empty. Pages uploads `build/` itself using its own credentials,
-so nothing else is needed and every push to `main` deploys itself.
-
-Framework preset stays **None**: the SvelteKit preset assumes `adapter-cloudflare`, and
-this is a pure static build via `adapter-static`.
-
-**There is deliberately no `wrangler.jsonc` in this repo.** Cloudflare's build system
-reads the presence of one as "this project deploys itself with wrangler" and fills in a
-deploy command, which then needs an API token the build container does not necessarily
-hold. The result is `Authentication error [code: 10000]` against `/pages/projects/...`
-immediately after a build that succeeded — an error that reads like a login problem and
-is really a wrong-tool problem. Without the file, Pages simply uploads the directory.
-
-Vite 8 also needs Node >= 20.19. `.nvmrc` pins 22; without it the build fails on a syntax
-error that says nothing about versions.
-
-**From your own machine**, if you would rather not wire up Git:
+**One-time setup.** The database has to exist before the first deploy, because the API
+routes have no fallback: no binding means every sync request answers 503.
 
 ```bash
-npm run build && npx wrangler pages deploy build --project-name=cairn
+npx wrangler d1 create cairn
 ```
 
-That path does need a token with **Cloudflare Pages -> Edit**. A token with only
-account-read scope authenticates fine and then fails the deploy — check it at
-[dash.cloudflare.com/profile/api-tokens](https://dash.cloudflare.com/profile/api-tokens).
+Paste the `database_id` it prints into [`wrangler.jsonc`](wrangler.jsonc), replacing the
+zeros, then create the schema in it:
+
+```bash
+npm run db:remote
+```
+
+The id is an identifier, not a secret — it belongs in the repository, and the binding
+cannot resolve without it.
+
+Both commands need a token with **D1 → Edit**; an account-read token authenticates
+happily and then fails with `Authentication error [code: 10000]`. Either widen the token
+at [dash.cloudflare.com/profile/api-tokens](https://dash.cloudflare.com/profile/api-tokens),
+or sidestep tokens entirely with `unset CLOUDFLARE_API_TOKEN && npx wrangler login`.
+
+**Then connect the repository to Pages** and set:
+
+| Setting                | Value                    |
+| ---------------------- | ------------------------ |
+| Framework preset       | None                     |
+| Build command          | `npm run build`          |
+| Build output directory | `.svelte-kit/cloudflare` |
+| Deploy command         | (blank)                  |
+| Root directory         | (blank)                  |
+
+Push to `main` and it deploys itself.
+
+### Three ways this goes wrong
+
+**`wrangler.jsonc` must keep its `pages_build_output_dir` key.** That single key is how
+Cloudflare's build system tells a Pages project from a Workers one. Without it the file
+is read as a Workers config, the build system helpfully fills in `npx wrangler deploy`,
+and the deploy fails with `Authentication error [code: 10000]` against
+`/pages/projects/…` — immediately after a build that succeeded. It reads like a login
+problem and is really a wrong-tool problem. With the key present, Pages uploads the
+directory using its own credentials and no token is involved.
+
+**That file also outranks the dashboard.** Once `pages_build_output_dir` exists, Pages
+takes bindings from the file rather than from **Settings → Bindings**, so a `DB` binding
+added by hand in the dashboard will be silently ignored. Change the binding here.
+
+**Node must be ≥ 20.19** for Vite 8. `.nvmrc` pins 22; without it the build dies on a
+syntax error that never mentions versions.
+
+### Running the server locally
+
+`npm run dev` gives you the UI, but `/api` needs a real Worker and a real D1:
+
+```bash
+npm run build && npm run db:local && npm run dev:worker
+```
 
 ## How it is built
 
@@ -132,6 +156,8 @@ See [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md) for the schema and its invariants
 about.
 
 Tests: 1779 unit assertions run under Europe/London, America/Los_Angeles and
-Pacific/Chatham (a 45-minute offset that observes DST), plus 45 Playwright tests covering
+Pacific/Chatham (a 45-minute offset that observes DST), plus 52 Playwright tests covering
 the core flows, onboarding, offline behaviour, installability, the export/import round
-trip, and what happens when a write fails.
+trip, and what happens when a write fails. Seven of those drive two isolated browser
+contexts against one account, which is the only way to prove the sync layer does anything
+— a second tab shares cookies and IndexedDB, so it would prove nothing.

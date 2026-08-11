@@ -47,11 +47,40 @@ would have served the home page instead.
 **`Week` gained a `reviewSteps` field.** Review progress must survive a reload mid-ritual,
 and the week it belongs to is its natural home.
 
+## Built — accounts and sync
+
+The deferral below was taken up: two devices are now the point. `SyncingRepository` wraps
+`DexieRepository` behind the same interface, which is why no route and no component
+changed. The full design, including what was rejected, is in [`SYNC.md`](SYNC.md).
+
+| Piece                   | Where it lives                                     |
+| ----------------------- | -------------------------------------------------- |
+| Wire protocol and diff  | `src/lib/sync/protocol.ts`, `diff.ts`, `client.ts` |
+| Server-first writes     | `src/lib/repo/syncing-repo.ts`                     |
+| Auth, sessions, hashing | `src/lib/server/`, `src/routes/api/auth/`          |
+| The sync endpoint       | `src/routes/api/sync/+server.ts`                   |
+| Schema and invariants   | `migrations/0001_initial.sql`                      |
+
+**The server is the arbiter; there is no merge algorithm.** Writes go to D1 first and are
+kept locally only if it accepted them, so there is never a divergent history to reconcile.
+The cost is that most writes need a connection — accepted deliberately, because the
+alternative is a CRDT whose conflict rules would have to encode "one next action per
+project", and a rule that subtle is not something to infer from concurrent edits.
+
+**Capture is the sole exception.** Inbox items are appends and therefore cannot conflict,
+so they queue offline and flush on reconnect. Capture is also the one write that must
+never fail — it is the whole promise of the brain dump.
+
+**Invariants moved into SQL.** A Dexie transaction constrains one device; a partial unique
+index constrains the account. Both `tasks_one_next_action` and `weeks_one_open` are
+enforced by the database, which is what makes the two-device tests meaningful.
+
+**Deliberately still missing: password reset.** It needs email, which means a provider, a
+domain, and deliverability. Export from Settings is the answer until then, and the app
+says so rather than implying otherwise.
+
 ## Deferred, behind the repository interface
 
-- **Sync.** `CairnRepository` in `src/lib/repo/index.ts` is the only thing that touches
-  Dexie. Dexie Cloud, a CRDT store, or an end-to-end-encrypted blob on a Cloudflare
-  Durable Object all replace one file. Add it only when two devices are in daily use.
 - **Android Web Share Target.** A `share_target` entry in the manifest plus a `/share`
   route writing to the inbox. Requires an installed PWA; absent on iOS, so it needs a
   clipboard-paste fallback.
