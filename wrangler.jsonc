@@ -1,16 +1,24 @@
 {
-	// Cloudflare PAGES configuration — not a Worker.
+	// Cloudflare Workers, serving static assets. There is no Worker script — Cairn is a
+	// pure static site with no server, no bindings and no secrets.
 	//
-	// Cairn is a pure static site: no Worker, no bindings, no secrets, no server. This
-	// file exists so `wrangler pages deploy` needs no flags.
+	// Why Workers rather than Pages: Cloudflare's build system provisions credentials
+	// scoped to the project it created. A Workers project gets a Workers-scoped token, so
+	// `wrangler pages deploy` from inside that build fails with
+	// `Authentication error [code: 10000]` against /pages/projects/... — which reads like
+	// a login problem and is really a wrong-API problem. Static assets on Workers is also
+	// where Cloudflare is steering new projects.
 	//
-	// CAUTION: Cloudflare's build system sees a wrangler config and may set the project's
-	// deploy command to `npx wrangler deploy` — the Workers command. That fails here,
-	// because there is no `main` and no `assets` block, and the build log makes it look
-	// like a build problem when the build actually succeeded. The deploy command must be
-	// `npx wrangler pages deploy`.
+	// If this ever moves back to a real Pages project, swap `assets` for
+	// `"pages_build_output_dir": "build"` and use `wrangler pages deploy`.
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "cairn",
 	"compatibility_date": "2026-08-10",
-	"pages_build_output_dir": "build"
+	"assets": {
+		"directory": "./build",
+		// Every route is prerendered to its own file, so an unknown path really is
+		// unknown. `single-page-application` would answer it with the home page under the
+		// wrong URL, which is worse than an honest 404.
+		"not_found_handling": "none"
+	}
 }
