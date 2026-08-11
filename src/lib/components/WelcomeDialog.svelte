@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { seedExample } from '$lib/onboarding/seed';
+	import { fireAndForget } from '$lib/stores/actions';
 	import { app } from '$lib/stores/app.svelte';
 	import { toasts } from '$lib/stores/toasts.svelte';
 	import { tour } from '$lib/stores/tour.svelte';
@@ -31,12 +32,19 @@
 	 */
 	let withExample = $state(true);
 
-	async function finish() {
-		// Recorded first, then closed. The other order let a dismissal race a reload —
-		// close the tab straight after and you would be greeted all over again.
-		await app.repository.setSetting('onboardedAt', Date.now());
+	function finish() {
+		/*
+		 * Closes first, records afterwards.
+		 *
+		 * Recording first was right when this was a local write. It is wrong now that
+		 * settings sync: `setSetting` is a network call, and awaiting it means a dropped
+		 * connection leaves a modal dialog on screen with no way past it — and because it
+		 * is modal, the rest of the app is inert behind it. The worst case for closing
+		 * first is being greeted once more on a later visit.
+		 */
 		open = false;
 		onclose();
+		fireAndForget(app.repository.setSetting('onboardedAt', Date.now()));
 	}
 
 	async function takeTour() {
@@ -47,7 +55,7 @@
 				await seedExample(app.repository);
 				toasts.show('Added an example week. Delete any of it whenever you like.', { ms: 9000 });
 			}
-			await finish();
+			finish();
 			await goto(resolve('/'));
 			tour.start();
 		} finally {
@@ -56,7 +64,7 @@
 	}
 
 	async function readGuide() {
-		await finish();
+		finish();
 		await goto(resolve('/guide'));
 	}
 </script>
@@ -97,7 +105,8 @@
 	</ul>
 
 	<p class="small muted">
-		Everything stays in this browser. No account, no server, nothing sent anywhere.
+		Your work syncs to your other devices, and a copy stays in this browser so the app opens
+		instantly and keeps working offline.
 	</p>
 
 	<label class="example">

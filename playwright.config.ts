@@ -25,7 +25,15 @@ export default defineConfig({
 		}
 	],
 	webServer: {
-		command: 'npm run build && npm run preview -- --port 4173 --strictPort',
+		/*
+		 * The real Worker, not `vite preview`.
+		 *
+		 * Half of what these specs exercise now — sessions, sync, the D1 constraints that
+		 * enforce one next action per project — only exists behind the Worker. A static
+		 * preview would pass every test that does not matter and none that do.
+		 */
+		command:
+			'npm run build && npx wrangler d1 migrations apply cairn --local && npx wrangler pages dev --port 4173',
 		port: 4173,
 		/*
 		 * Never reuse. Reusing meant Playwright skipped the build and pointed a fresh

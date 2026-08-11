@@ -106,8 +106,8 @@
 		<div>
 			<p class="title">Ask the browser to keep your data</p>
 			<p class="small">
-				This marks Cairn's storage as worth keeping when space runs low. Nothing leaves your device
-				either way.
+				This marks Cairn's offline copy as worth keeping when space runs low, so the app still opens
+				with no connection.
 			</p>
 			<div class="actions">
 				<button type="button" class="btn btn-sm btn-primary" onclick={grantPersistence}>
@@ -127,7 +127,8 @@
 					: 'It has been a while since your last backup'}
 			</p>
 			<p class="small">
-				Everything is in this browser and nowhere else. One file, saved wherever you like.
+				The only copy that survives losing access to your account. One file, saved wherever you
+				like.
 			</p>
 			<div class="actions">
 				<a href={resolve('/settings')} class="btn btn-sm">Export now</a>

@@ -35,6 +35,7 @@ class AppStore {
 	private repo: CairnRepository | null = null;
 	private subscription: Subscription | null = null;
 	private midnightTimer: ReturnType<typeof setTimeout> | null = null;
+	private awaitingSnapshot: Array<() => void> = [];
 
 	snapshot = $state<Snapshot>({ ...EMPTY_SNAPSHOT });
 	/** False until the first emission, so the UI can avoid flashing empty states. */
@@ -127,18 +128,15 @@ class AppStore {
 		if (this.subscription) return;
 		this.repo = reportWriteFailures(repo);
 
-		try {
-			await this.repo.ensureCurrentWeek();
-		} catch (err) {
-			this.error = describeError(err);
-			return;
-		}
-
 		this.subscription = this.repo.observeSnapshot().subscribe(
 			(value) => {
 				this.snapshot = value;
 				this.ready = true;
 				this.error = null;
+
+				const waiting = this.awaitingSnapshot;
+				this.awaitingSnapshot = [];
+				for (const resolve of waiting) resolve();
 			},
 			(err) => {
 				this.error = describeError(err);
@@ -160,6 +158,29 @@ class AppStore {
 		if (typeof document !== 'undefined') {
 			document.removeEventListener('visibilitychange', this.handleVisibility);
 		}
+	}
+
+	/**
+	 * Resolves when the next snapshot lands, or after `timeoutMs` regardless.
+	 *
+	 * A write to the database and the store seeing it are two different moments —
+	 * `liveQuery` re-emits asynchronously. Anything that keys off the *contents* of the
+	 * snapshot right after a sync has to wait for this, or it reads the state from before
+	 * the sync and acts on it. The timeout is a safety valve: no caller should hang
+	 * forever because an emission never came.
+	 */
+	waitForSnapshot(timeoutMs = 3000): Promise<void> {
+		return new Promise((resolve) => {
+			const done = () => {
+				clearTimeout(timer);
+				resolve();
+			};
+			const timer = setTimeout(() => {
+				this.awaitingSnapshot = this.awaitingSnapshot.filter((fn) => fn !== done);
+				resolve();
+			}, timeoutMs);
+			this.awaitingSnapshot.push(done);
+		});
 	}
 
 	/** The repository, once started. Throws rather than silently no-op'ing. */

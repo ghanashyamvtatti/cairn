@@ -1,5 +1,5 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
-import { normaliseEmail } from '$lib/server/credentials';
+import { normaliseEmail } from '$lib/domain/credentials';
 import { hashPassword, verifyPassword, type PasswordRecord } from '$lib/server/crypto';
 import { requireDb } from '$lib/server/db';
 import { createSession, setSessionCookie } from '$lib/server/session';

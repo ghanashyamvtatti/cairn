@@ -2,6 +2,26 @@ import Dexie, { type Table } from 'dexie';
 import type { FixedDate, InboxItem, Project, Setting, Task, Week } from '$lib/types';
 
 /**
+ * Local-only bookkeeping for sync. Never sent to the server.
+ */
+export interface MetaRow {
+	key: 'cursor' | 'accountId';
+	value: string | number;
+}
+
+/**
+ * Captures made while offline, waiting to be pushed.
+ *
+ * Only ever inbox items. They are appends — they reference nothing and nothing references
+ * them — so two devices queueing them offline can never conflict, which is the entire
+ * reason capture is allowed to work without a connection when nothing else is.
+ */
+export interface OutboxRow {
+	id: string;
+	queuedAt: number;
+}
+
+/**
  * Dexie schema.
  *
  * Two IndexedDB rules drive what is indexed here: booleans and `null` are not valid
@@ -21,6 +41,8 @@ export class CairnDatabase extends Dexie {
 	fixedDates!: Table<FixedDate, string>;
 	weeks!: Table<Week, string>;
 	settings!: Table<Setting, string>;
+	meta!: Table<MetaRow, string>;
+	outbox!: Table<OutboxRow, string>;
 
 	constructor(name: string = DB_NAME) {
 		super(name);
@@ -32,6 +54,19 @@ export class CairnDatabase extends Dexie {
 			fixedDates: 'id, date',
 			weeks: 'id, startedAt',
 			settings: 'key'
+		});
+
+		// v2 adds the sync cursor and the offline capture queue. Dexie carries every
+		// existing row across untouched; only the new stores appear.
+		this.version(2).stores({
+			projects: 'id, status, order, updatedAt',
+			tasks: 'id, projectId, weekId, updatedAt',
+			inboxItems: 'id, createdAt',
+			fixedDates: 'id, date',
+			weeks: 'id, startedAt',
+			settings: 'key',
+			meta: 'key',
+			outbox: 'id, queuedAt'
 		});
 	}
 }

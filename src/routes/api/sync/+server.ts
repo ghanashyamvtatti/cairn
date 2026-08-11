@@ -85,12 +85,29 @@ export const POST: RequestHandler = async (event) => {
 	// --- claim a sequence number and write everything at it
 	const seq = await nextSeq(db, accountId);
 	const now = Date.now();
+	/*
+	 * Demotions before promotions.
+	 *
+	 * `tasks_one_next_action` is checked per statement, not deferred to the end of the
+	 * transaction. Moving a project's next action means one row loses the flag and another
+	 * gains it, and if the gain is written first there is an instant where two live tasks
+	 * in the same project carry it — which the index correctly refuses. Ordering the
+	 * batch removes the instant. The same reasoning applies to closing one week and
+	 * opening the next.
+	 */
+	const tasks = [...(push.tasks ?? [])].sort(
+		(a, b) => Number(a.isNextAction) - Number(b.isNextAction)
+	);
+	const weeks = [...(push.weeks ?? [])].sort(
+		(a, b) => Number(a.endedAt === null) - Number(b.endedAt === null)
+	);
+
 	const statements: Statement[] = [
 		...(push.projects ?? []).map((r) => upsertProject(accountId, seq, r)),
-		...(push.tasks ?? []).map((r) => upsertTask(accountId, seq, r)),
+		...tasks.map((r) => upsertTask(accountId, seq, r)),
 		...(push.inboxItems ?? []).map((r) => upsertInboxItem(accountId, seq, r)),
 		...(push.fixedDates ?? []).map((r) => upsertFixedDate(accountId, seq, r)),
-		...(push.weeks ?? []).map((r) => upsertWeek(accountId, seq, r)),
+		...weeks.map((r) => upsertWeek(accountId, seq, r)),
 		...settingKeys.map((key) => upsertSetting(accountId, seq, key, (push.settings ?? {})[key], now))
 	];
 

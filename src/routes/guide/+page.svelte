@@ -176,18 +176,21 @@
 <section class="card block">
 	<h2>Where your data lives</h2>
 	<p>
-		In this browser, on this device, and nowhere else. There is no account, no server and no
-		telemetry, and the app makes no network requests at all once loaded.
+		On Cairn's server, under your account, so your laptop and your phone show the same thing. A copy
+		is also kept in this browser, which is why the app opens instantly and why you can still read
+		everything and capture new thoughts with no connection.
 	</p>
 	<p>
-		The flip side is that a browser can clear its own storage. <strong
-			>Export a backup from <a href={resolve('/settings')}>Settings</a></strong
-		> now and then — it is one file, written entirely on your machine.
+		Anything other than capture needs a connection, and Cairn says so rather than accepting a change
+		it cannot keep. That is deliberate: with one place deciding what happened, two devices cannot
+		quietly disagree.
 	</p>
 	<p>
-		<strong>On iPhone and iPad this matters more than usual.</strong> Safari deletes a website's stored
-		data after seven days without a visit. Web apps added to the Home Screen are not part of Safari and
-		are exempt — so if you use Cairn on iOS, tap Share and then Add to Home Screen.
+		There is no analytics and no telemetry, and nothing is shared or sold. But your data is readable
+		by whoever runs the server, so it is a matter of trust rather than mathematics.
+		<strong>Export a backup from <a href={resolve('/settings')}>Settings</a></strong> now and then — it
+		is written entirely on your machine, and it is the only copy that survives losing access to the account.
+		There is no password reset yet.
 	</p>
 </section>
 

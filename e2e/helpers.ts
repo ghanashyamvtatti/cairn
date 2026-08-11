@@ -9,6 +9,40 @@ import { expect, type Page } from '@playwright/test';
  * limit" assertions would be meaningless.
  */
 
+/**
+ * A fresh account per spec.
+ *
+ * Isolation used to mean clearing IndexedDB. Now that the server holds the truth, two
+ * specs sharing an account would see each other's projects however clean the browser is,
+ * so each one signs up as somebody new.
+ */
+let accountCounter = 0;
+export function uniqueEmail(): string {
+	accountCounter += 1;
+	return `spec-${Date.now().toString(36)}-${accountCounter}-${Math.random().toString(36).slice(2, 8)}@test.invalid`;
+}
+
+export const TEST_PASSWORD = 'correct-horse-battery';
+
+/** Signs up as a brand-new account on an already-loaded page. */
+export async function signUp(page: Page, email = uniqueEmail()): Promise<string> {
+	await page.getByTestId('auth-switch').click();
+	await page.getByTestId('auth-email').fill(email);
+	await page.getByTestId('auth-password').fill(TEST_PASSWORD);
+	await page.getByTestId('auth-submit').click();
+	await expect(page.getByTestId('open-capture')).toBeVisible({ timeout: 15_000 });
+	return email;
+}
+
+/** Signs in to an existing account, as a second device would. */
+export async function signIn(page: Page, email: string): Promise<void> {
+	await page.goto('/');
+	await page.getByTestId('auth-email').fill(email);
+	await page.getByTestId('auth-password').fill(TEST_PASSWORD);
+	await page.getByTestId('auth-submit').click();
+	await expect(page.getByTestId('open-capture')).toBeVisible({ timeout: 15_000 });
+}
+
 export async function resetApp(page: Page, options: { keepWelcome?: boolean } = {}) {
 	// Land on the app once so the origin exists, then delete the database and reload so
 	// the store re-opens from scratch.
@@ -23,6 +57,9 @@ export async function resetApp(page: Page, options: { keepWelcome?: boolean } = 
 		});
 	});
 	await page.reload();
+
+	await expect(page.getByTestId('auth-submit')).toBeVisible({ timeout: 15_000 });
+	await signUp(page);
 	await expect(page.getByRole('heading', { name: 'This week' })).toBeVisible();
 
 	/*

@@ -16,7 +16,10 @@
 		"test": "npm run test:unit && npm run test:e2e",
 		"test:e2e": "playwright install && playwright test",
 		"icons": "pwa-assets-generator --preset minimal-2023 static/icon-source.svg",
-		"test:watch": "vitest"
+		"test:watch": "vitest",
+		"db:local": "wrangler d1 migrations apply cairn --local",
+		"db:remote": "wrangler d1 migrations apply cairn --remote",
+		"dev:worker": "wrangler pages dev"
 	},
 	"devDependencies": {
 		"@cloudflare/workers-types": "^5.20260811.1",

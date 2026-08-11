@@ -12,6 +12,7 @@
 	import { MAX_WIP_LIMIT, MIN_WIP_LIMIT } from '$lib/domain/wip';
 	import { formatBytes } from '$lib/platform/environment';
 	import { downloadText, readFileAsText } from '$lib/platform/download';
+	import { account } from '$lib/stores/account.svelte';
 	import { app } from '$lib/stores/app.svelte';
 	import { platform } from '$lib/stores/platform.svelte';
 	import { toasts } from '$lib/stores/toasts.svelte';
@@ -51,7 +52,7 @@
 		const file = await app.repository.exportAll();
 		downloadText(backupFilename(Date.now()), serializeBackup(file));
 		await app.repository.setSetting('lastExportAt', Date.now());
-		toasts.show('Backup saved. It never left your device.');
+		toasts.show('Backup saved to this device.');
 	}
 
 	async function pickFile(event: Event) {
@@ -125,6 +126,10 @@
 		);
 	}
 
+	async function signOut() {
+		await account.signOut();
+	}
+
 	async function clearEverything() {
 		/*
 		 * Deletes content, keeps preferences.
@@ -158,12 +163,50 @@
 	<h1>Settings</h1>
 </header>
 
+<section class="card block">
+	<h2>Account</h2>
+	<dl class="facts">
+		<dt>Signed in as</dt>
+		<dd data-testid="account-email">{account.account?.email ?? '—'}</dd>
+		<dt>Syncing</dt>
+		<dd>
+			{#if !account.online}
+				Offline. You can read everything and capture new thoughts; the rest waits.
+			{:else if account.pending > 0}
+				{account.pending} captured {account.pending === 1 ? 'thought' : 'thoughts'} still to send.
+			{:else}
+				Up to date on this device.
+			{/if}
+		</dd>
+	</dl>
+
+	<div class="actions">
+		<button
+			type="button"
+			class="btn btn-sm"
+			onclick={() => account.refresh()}
+			disabled={!account.online}
+			data-testid="sync-now"
+		>
+			Sync now
+		</button>
+		<button type="button" class="btn btn-sm" onclick={signOut} data-testid="sign-out">
+			Sign out
+		</button>
+	</div>
+
+	<p class="small faint">
+		Signing out removes this device's copy of your data. It stays on the server and comes back when
+		you sign in again.
+	</p>
+</section>
+
 <section class="card block" data-tour="backup">
 	<h2>Your data</h2>
 	<p class="muted small">
-		Everything lives in this browser. There is no account, no server, and nothing is sent anywhere.
-		That also means a backup is the only copy that survives a cleared browser — which is why this
-		section is first.
+		Your data lives on Cairn's server so your devices agree, and a copy is kept in this browser so
+		the app opens instantly and works offline. An export is still worth having: it is the only copy
+		that survives you losing access to the account.
 	</p>
 
 	<div class="actions">
@@ -328,7 +371,8 @@
 </section>
 
 <p class="colophon small faint">
-	Cairn is local-first and account-free. No analytics, no telemetry, no network calls.
+	No analytics and no telemetry. Cairn talks to its own server to keep your devices in step, and to
+	nothing else.
 </p>
 
 <!-- Import confirmation: replacing everything is the one action here that cannot be undone. -->

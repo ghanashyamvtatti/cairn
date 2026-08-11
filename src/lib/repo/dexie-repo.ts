@@ -573,6 +573,36 @@ export class DexieRepository implements CairnRepository {
 		};
 	}
 
+	/**
+	 * Folds rows arriving from the server into the local cache.
+	 *
+	 * Upserts only, never a clear. `importAll` empties every table first, and doing that on
+	 * each pull made the UI flicker through an empty state — which destroys keyed
+	 * components and, with them, whatever the user was in the middle of typing. Tombstones
+	 * arrive as ordinary rows carrying `deletedAt`, so nothing ever needs removing.
+	 */
+	async applyServerRows(payload: {
+		projects: Project[];
+		tasks: Task[];
+		inboxItems: InboxItem[];
+		fixedDates: FixedDate[];
+		weeks: Week[];
+		settings: Partial<SettingsMap>;
+	}): Promise<void> {
+		await this.db.transaction('rw', this.allTables(), async () => {
+			if (payload.projects.length) await this.db.projects.bulkPut(payload.projects);
+			if (payload.tasks.length) await this.db.tasks.bulkPut(payload.tasks);
+			if (payload.inboxItems.length) await this.db.inboxItems.bulkPut(payload.inboxItems);
+			if (payload.fixedDates.length) await this.db.fixedDates.bulkPut(payload.fixedDates);
+			if (payload.weeks.length) await this.db.weeks.bulkPut(payload.weeks);
+
+			const settings = Object.entries(payload.settings);
+			if (settings.length) {
+				await this.db.settings.bulkPut(settings.map(([key, value]) => ({ key, value }) as Setting));
+			}
+		});
+	}
+
 	async clearAll(): Promise<void> {
 		await this.db.transaction('rw', this.allTables(), async () => {
 			await this.db.projects.clear();

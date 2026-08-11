@@ -1,9 +1,10 @@
 /**
  * Validation for the two fields an account has.
  *
- * Kept as pure functions so the rules are unit-testable and so the sign-up form can
- * apply exactly the same ones the server will, rather than approximating them and
- * disagreeing at the worst moment.
+ * Pure, and deliberately NOT under `src/lib/server`: the sign-up form has to apply
+ * exactly the rules the server will, and a second approximation of them in the UI would
+ * disagree at the worst possible moment. `$lib/server` is unimportable from client code,
+ * which is the right protection for secrets and the wrong one for shared rules.
  */
 
 export const MIN_PASSWORD_LENGTH = 10;

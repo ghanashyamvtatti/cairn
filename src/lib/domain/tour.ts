@@ -79,8 +79,8 @@ export const TOUR_STEPS: readonly TourStep[] = [
 		id: 'data',
 		route: '/settings',
 		target: '[data-tour="backup"]',
-		title: 'Your data is here and nowhere else',
-		body: 'No account, no server, nothing sent anywhere. That also means a backup is the only copy that survives a cleared browser — so export one now and then. On an iPhone, add Cairn to your Home Screen: Safari deletes ordinary site data after seven days.'
+		title: 'Your data follows you',
+		body: 'Your account keeps this device and your others showing the same thing, and a copy stays here so the app opens instantly and works offline. Export a backup now and then anyway — it is the only copy that survives losing access to the account.'
 	}
 ] as const;
 
