@@ -73,9 +73,15 @@ server, no bindings, no secrets.
 this repository, and set:
 
 - Build command: `npm run build`
-- Output directory: `build`
+- Build output directory: `build`
+- Deploy command: `npx wrangler pages deploy` — or leave it empty
 
 Every push to `main` then deploys itself.
+
+If a deploy command field exists and Cloudflare has pre-filled it with `npx wrangler
+deploy`, change it. That is the _Workers_ command; it needs a Worker entrypoint, which a
+static site does not have, so it fails with "Missing entry-point" immediately after a
+build that succeeded — which reads like a build failure and is not one.
 
 **Cloudflare Pages, from the CLI.** `wrangler.jsonc` already points at `build/`, so:
 
