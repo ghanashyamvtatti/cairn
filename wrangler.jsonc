@@ -10,15 +10,22 @@
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "cairn",
 	"compatibility_date": "2026-08-10",
-	"compatibility_flags": ["nodejs_compat"],
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
 	"pages_build_output_dir": ".svelte-kit/cloudflare",
 	"d1_databases": [
 		{
 			"binding": "DB",
 			"database_name": "cairn",
 			// Replace with the id printed by `wrangler d1 create cairn`.
-			"database_id": "00000000-0000-0000-0000-000000000000",
+			"database_id": "f24799ce-2e13-45f9-ada0-710a71e21cbe",
 			"migrations_dir": "migrations"
+		},
+		{
+			"binding": "cairn",
+			"database_name": "cairn",
+			"database_id": "f24799ce-2e13-45f9-ada0-710a71e21cbe"
 		}
 	]
 }
