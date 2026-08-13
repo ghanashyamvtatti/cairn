@@ -1,6 +1,21 @@
 import { building } from '$app/environment';
-import type { Handle } from '@sveltejs/kit';
+import type { Handle, HandleServerError } from '@sveltejs/kit';
 import { SESSION_COOKIE, resolveSession } from '$lib/server/session';
+
+/**
+ * Puts the real exception in the Worker log, and nothing new on the wire.
+ *
+ * Without this, an unexpected throw in an endpoint reaches the client as SvelteKit's
+ * bare `{"message":"Internal Error"}` and is written down nowhere. That is what a
+ * platform-level `NotSupportedError` from `crypto.subtle` looked like from the outside:
+ * a 500 with no cause, on a route whose validation and database access both demonstrably
+ * worked. The message and stack belong in `wrangler pages deployment tail`, not in the
+ * response — the client shape is deliberately unchanged.
+ */
+export const handleError: HandleServerError = ({ error, event }) => {
+	console.error(`[${event.request.method}] ${event.url.pathname}`, error);
+	return { message: 'Internal Error' };
+};
 
 /**
  * Resolves the session once per request and hands it to endpoints via `locals`.

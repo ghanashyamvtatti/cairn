@@ -8,8 +8,26 @@
  * anyone's existing password.
  */
 
-/** OWASP's floor for PBKDF2-HMAC-SHA256 as of 2023, and cheap enough for an edge runtime. */
-export const PBKDF2_ITERATIONS = 210_000;
+/**
+ * The most PBKDF2 iterations Cloudflare will run. Not a considered choice — a ceiling.
+ *
+ * workerd's production limit enforcer caps this at 100,000
+ * (`DEFAULT_MAX_PBKDF2_ITERATIONS` in `src/workerd/io/limit-enforcer.h`) and
+ * `crypto.subtle.deriveBits` throws `NotSupportedError: Pbkdf2 failed: iteration counts
+ * above 100000 are not supported` for anything higher. There is no compatibility flag
+ * and no paid-plan escape hatch; scrypt is capped separately by the same header.
+ *
+ * This sits below what OWASP recommends for PBKDF2-HMAC-SHA256, which is worth knowing
+ * and cannot currently be fixed by raising the number. `iterations` is stored per account
+ * precisely so it can be raised the day the platform allows it, without invalidating a
+ * single existing password.
+ *
+ * Do not "fix" this upward on security advice: it fails only in production. The
+ * standalone workerd that `wrangler pages dev` runs overrides the cap to no limit at all
+ * (`server.c++`), so the whole e2e suite passes at any value while the deployed app
+ * answers 500 to every sign-up. `crypto.spec.ts` guards the constant for that reason.
+ */
+export const PBKDF2_ITERATIONS = 100_000;
 
 const encoder = new TextEncoder();
 

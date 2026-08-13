@@ -82,6 +82,12 @@ reduce or increase overwhelm?** If it increases it, it is a non-goal.
   because the access itself is the error. `hooks.server.ts` guards with `building`.
 - **`@cloudflare/workers-types` must not be referenced globally.** It replaces the DOM
   lib, and client code loses `document`. Import `D1Database` inline instead.
+- **Cloudflare caps PBKDF2 at 100,000 iterations, and only in production.** Above it,
+  `crypto.subtle.deriveBits` throws `NotSupportedError`. The standalone workerd behind
+  `wrangler pages dev` overrides the cap to no limit, so a higher count passes every unit
+  test and all 52 e2e tests against a real Worker, then answers 500 to every sign-up on
+  the deployed app. The cap is undocumented in Cloudflare's Web Crypto page. Local
+  parity is not evidence for anything a limit enforcer governs.
 - **SQLite checks unique indexes per statement, not at commit.** Moving a next action
   must write the demotion before the promotion, or the index sees two flagged tasks.
 - **Never key UI off "the app looks empty" while signing in.** The cache is wiped before
