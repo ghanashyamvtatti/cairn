@@ -158,8 +158,11 @@ test.describe('the today view', () => {
 		await page.getByTestId('manifest-title').fill('Filing deadline');
 		await page.getByTestId('manifest-date').fill(localIsoDate(3));
 		await page.getByTestId('manifest-add').click();
-		// Wait for the first add to land: it clears the form when it does, and filling
-		// the second entry before that wipes the half-typed row.
+		// Wait for the form to clear itself, not merely for the row to appear: the row
+		// renders off the live snapshot, which can emit before the add's promise resolves
+		// — and its resolution is what clears the fields, wiping a second entry typed in
+		// too early.
+		await expect(page.getByTestId('manifest-title')).toHaveValue('');
 		await expect(page.getByTestId('manifest-row')).toHaveCount(1);
 		await page.getByTestId('manifest-title').fill('Passport renewal');
 		await page.getByTestId('manifest-date').fill(localIsoDate(60));
