@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+	COMING_UP_LIMIT,
 	IMMINENT_DAYS,
 	NEAR_DAYS,
+	comingUpSoon,
 	countdownFor,
 	parseIsoDate,
 	partitionByDate,
@@ -660,5 +662,48 @@ describe('partitionFixedDates', () => {
 
 	it('returns three empty arrays for empty input', () => {
 		expect(partitionFixedDates([], NOW)).toEqual({ upcoming: [], passed: [], invalid: [] });
+	});
+});
+
+describe('comingUpSoon', () => {
+	it('keeps only dates inside the horizon, soonest first', () => {
+		const items = [
+			fixed('far', 'Far', isoFromNow(NEAR_DAYS + 1)),
+			fixed('edge', 'Edge', isoFromNow(NEAR_DAYS)),
+			fixed('today', 'Today', isoFromNow(0)),
+			fixed('soon', 'Soon', isoFromNow(3))
+		];
+		expect(comingUpSoon(items, NOW).map((item) => item.id)).toEqual(['today', 'soon', 'edge']);
+	});
+
+	it('never shows a passed or unreadable date', () => {
+		const items = [
+			fixed('past', 'Past', isoFromNow(-1)),
+			fixed('broken', 'Broken', '2026-02-30'),
+			fixed('ok', 'Ok', isoFromNow(1))
+		];
+		expect(comingUpSoon(items, NOW).map((item) => item.id)).toEqual(['ok']);
+	});
+
+	it('caps the strip so Today stays a glance, not a scroll', () => {
+		const items = Array.from({ length: COMING_UP_LIMIT + 4 }, (_, i) =>
+			fixed(`d${i}`, `D${i}`, isoFromNow(1 + (i % NEAR_DAYS)))
+		);
+		expect(comingUpSoon(items, NOW)).toHaveLength(COMING_UP_LIMIT);
+	});
+
+	it('honours a caller-chosen horizon and limit', () => {
+		const items = [
+			fixed('a', 'A', isoFromNow(1)),
+			fixed('b', 'B', isoFromNow(2)),
+			fixed('c', 'C', isoFromNow(9))
+		];
+		expect(comingUpSoon(items, NOW, { horizonDays: 5, limit: 1 }).map((item) => item.id)).toEqual([
+			'a'
+		]);
+	});
+
+	it('returns nothing for an empty board', () => {
+		expect(comingUpSoon([], NOW)).toEqual([]);
 	});
 });

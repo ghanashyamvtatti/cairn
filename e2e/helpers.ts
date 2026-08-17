@@ -63,7 +63,7 @@ export async function resetApp(page: Page, options: { keepWelcome?: boolean } = 
 
 	await expect(page.getByTestId('auth-submit')).toBeVisible({ timeout: 15_000 });
 	await signUp(page);
-	await expect(page.getByRole('heading', { name: 'This week' })).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Today' })).toBeVisible();
 
 	/*
 	 * An empty database is, by definition, a first run — so the welcome appears and its
@@ -101,7 +101,15 @@ export async function capture(page: Page, text: string, options: { expectDate?: 
 	await expect(page.locator('dialog[open]')).toHaveCount(0);
 }
 
+/** Opens the projects page, where the cards and their management controls live. */
+export async function gotoProjects(page: Page) {
+	await page.getByTestId('nav-projects').first().click();
+	await expect(page.getByRole('heading', { name: 'Projects' })).toBeVisible();
+}
+
+/** Creates a project from wherever the page currently is, landing on /projects. */
 export async function createProject(page: Page, title: string) {
+	await gotoProjects(page);
 	await page.getByTestId('add-project').first().click();
 	const dialog = page.locator('dialog[open]');
 	await dialog.getByTestId('new-project-input').fill(title);

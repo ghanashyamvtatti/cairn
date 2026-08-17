@@ -11,7 +11,9 @@ describe('the tour', () => {
 		const visited = new Set(TOUR_STEPS.map((s) => s.route));
 
 		// The guide is read, not toured; everything else must be introduced.
-		expect(visited).toEqual(new Set(['/', '/inbox', '/manifest', '/review', '/settings']));
+		expect(visited).toEqual(
+			new Set(['/', '/projects', '/inbox', '/manifest', '/review', '/settings'])
+		);
 	});
 
 	it('only points at real routes', () => {

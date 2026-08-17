@@ -150,7 +150,33 @@ export function partitionByDate<T extends DatedItem & { title?: string; id?: str
 	return { upcoming, passed, invalid };
 }
 
-/** Convenience wrapper for the manifest page. */
+/** Convenience wrapper for the dates board. */
 export function partitionFixedDates(items: readonly FixedDate[], now: number | Date) {
 	return partitionByDate(items, now);
+}
+
+/** How many dates the Today screen shows at most. Enough to plan, few enough to glance. */
+export const COMING_UP_LIMIT = 5;
+
+/**
+ * The dates close enough to change what this week looks like.
+ *
+ * Today's "coming up" strip is deliberately not the whole board: a date six months out
+ * is noise every single morning, and noise repeated daily is how a calm surface stops
+ * being read at all. Everything else stays one tap away on the board itself.
+ */
+export function comingUpSoon<T extends DatedItem & { title?: string; id?: string }>(
+	items: readonly T[],
+	now: number | Date,
+	{
+		horizonDays = NEAR_DAYS,
+		limit = COMING_UP_LIMIT
+	}: { horizonDays?: number; limit?: number } = {}
+): T[] {
+	return partitionByDate(items, now)
+		.upcoming.filter((item) => {
+			const countdown = countdownFor(item.date, now);
+			return countdown !== null && countdown.days <= horizonDays;
+		})
+		.slice(0, limit);
 }

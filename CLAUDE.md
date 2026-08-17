@@ -3,6 +3,11 @@
 A calm, private, local-first task manager. Three projects. One next action each. A board
 of hard deadlines. A place to dump your brain. One fifteen-minute review to reset the week.
 
+The app opens on **Today** (`/`): one next action per active project, tickable in place,
+plus the dates arriving within a fortnight. Management lives one tab away — Projects
+(`/projects`), Dates (labelled "Dates" everywhere, route kept at `/manifest`), Inbox and
+Review.
+
 ## Stack
 
 SvelteKit 2 (Svelte 5 runes) · TypeScript · `adapter-cloudflare` · Dexie (IndexedDB) ·
