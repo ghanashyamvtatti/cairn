@@ -158,9 +158,13 @@ test.describe('the today view', () => {
 		await page.getByTestId('manifest-title').fill('Filing deadline');
 		await page.getByTestId('manifest-date').fill(localIsoDate(3));
 		await page.getByTestId('manifest-add').click();
+		// Wait for the first add to land: it clears the form when it does, and filling
+		// the second entry before that wipes the half-typed row.
+		await expect(page.getByTestId('manifest-row')).toHaveCount(1);
 		await page.getByTestId('manifest-title').fill('Passport renewal');
 		await page.getByTestId('manifest-date').fill(localIsoDate(60));
 		await page.getByTestId('manifest-add').click();
+		await expect(page.getByTestId('manifest-row')).toHaveCount(2);
 
 		await page.getByTestId('nav-today').first().click();
 		const board = page.getByTestId('today-coming-up');
