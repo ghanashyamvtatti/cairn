@@ -1,43 +1,59 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import Icon from '$lib/components/Icon.svelte';
-	import NewProjectDialog from '$lib/components/NewProjectDialog.svelte';
 	import Nudges from '$lib/components/Nudges.svelte';
-	import ProjectCard from '$lib/components/ProjectCard.svelte';
-	import { overLimitMessage, wipStatus } from '$lib/domain/wip';
-	import { toasts } from '$lib/stores/toasts.svelte';
+	import TaskRow from '$lib/components/TaskRow.svelte';
+	import { comingUpSoon } from '$lib/domain/countdown';
 	import { formatWeekLabel } from '$lib/domain/week';
 	import { app } from '$lib/stores/app.svelte';
 	import { ui } from '$lib/stores/ui.svelte';
-
-	let newProjectOpen = $state(false);
+	import type { Project } from '$lib/types';
 
 	/**
-	 * Reactivating is the third way to add to the active set, so it gets the same
-	 * treatment: the move goes through, and the consequence is stated plainly.
+	 * Today: the one screen that answers "what should I do right now?".
+	 *
+	 * The previous home was a management surface — cards, menus, disclosure toggles —
+	 * and the actual answer was scattered across it and two other pages. This screen
+	 * assembles the answer instead of asking the user to: one next step per project,
+	 * checkable in place; the dates close enough to matter; a pointer to the inbox when
+	 * something is waiting. Everything else stays on its own page, one tap away.
+	 *
+	 * Completing a step swaps the row for a "what's the next step?" prompt in place, so
+	 * momentum and naming-the-next-step happen at the same moment instead of a project
+	 * silently stalling behind a card.
 	 */
-	async function reactivate(id: string) {
-		await app.repository.setProjectStatus(id, 'active');
-		const after = wipStatus(
-			app.snapshot.projects.map((p) => (p.id === id ? { ...p, status: 'active' as const } : p)),
-			app.settings.wipLimit
-		);
-		if (after.isOverLimit) {
-			toasts.show(overLimitMessage(after), { tone: 'attention' });
-		}
-	}
-
 	const weekLabel = $derived(app.currentWeek ? formatWeekLabel(app.currentWeek) : '');
-	const showParked = $derived(app.parked.length > 0);
+
+	/** Every active project paired with its next action, stalled ones included. */
+	const nextUp = $derived(
+		app.active.map((project) => ({ project, action: app.nextActionFor(project) }))
+	);
+
+	const comingUp = $derived(comingUpSoon(app.fixedDates, app.now));
+	/** Dates on the board but beyond the fortnight horizon. */
+	const laterCount = $derived(app.manifest.upcoming.length - comingUp.length);
+	const doneToday = $derived(app.completedThisWeek().length);
+
+	/** One draft per stalled project, so typing in one prompt never leaks into another. */
+	let drafts = $state<Record<string, string>>({});
+
+	async function setNext(event: SubmitEvent, project: Project) {
+		event.preventDefault();
+		const title = (drafts[project.id] ?? '').trim();
+		if (title === '') return;
+
+		drafts[project.id] = '';
+		await app.repository.addTask({ projectId: project.id, title, asNextAction: true });
+	}
 </script>
 
 <svelte:head>
-	<title>Projects · Cairn</title>
+	<title>Today · Cairn</title>
 </svelte:head>
 
 <header class="page-head">
 	<div>
-		<h1>This week</h1>
+		<h1>Today</h1>
 		{#if weekLabel}
 			<p class="muted small" data-testid="week-label">{weekLabel}</p>
 		{/if}
@@ -54,100 +70,114 @@
 <div class="page">
 	<Nudges />
 
-	{#if app.wip.isOverLimit}
-		<!--
-			A persistent, quiet statement rather than a dialog you dismiss once. The cap is
-			soft, so the only thing keeping it meaningful is that going over stays visible.
-		-->
-		<p class="over-limit" role="status" data-testid="wip-banner">
-			<Icon name="info" size={16} />
-			{overLimitMessage(app.wip)}
-		</p>
-	{/if}
-
 	{#if !app.ready}
 		<p class="muted" data-testid="loading">Opening your cairn…</p>
-	{:else if app.active.length === 0 && !showParked}
-		<section class="empty card" data-testid="empty-projects" data-tour="projects">
-			<h2>Nothing is running yet</h2>
+	{:else if app.active.length === 0}
+		<section class="empty card" data-testid="today-empty">
+			<h2>Nothing is moving yet</h2>
 			<p class="muted">
-				A project is an outcome that takes more than one step. Three at a time is the default,
-				because three is roughly what a week can actually hold.
-			</p>
-			<p class="muted small">
-				Not sure yet? Press <kbd>c</kbd> and empty your head into the inbox first — sorting is a separate
-				job from deciding.
+				Today shows one next step for each project you are running, so opening the app answers “what
+				now?” without any digging. Start a project and its next step will appear here.
 			</p>
 			<div class="empty-actions">
-				<button
-					type="button"
-					class="btn btn-primary"
-					onclick={() => (newProjectOpen = true)}
-					data-testid="add-project"
-				>
-					<Icon name="plus" size={16} /> Start a project
-				</button>
+				<a href={resolve('/projects')} class="btn btn-primary" data-testid="today-start-project">
+					<Icon name="projects" size={16} /> Start a project
+				</a>
 				<button type="button" class="btn" onclick={() => ui.openCapture()}>
-					Dump a thought instead
+					Jot a thought instead
 				</button>
 			</div>
 		</section>
 	{:else}
-		<div class="projects" data-tour="projects">
-			{#each app.active as project (project.id)}
-				<ProjectCard {project} />
-			{/each}
-		</div>
+		<section class="card next-up" data-testid="today-next-up" data-tour="next-up">
+			<header class="section-head">
+				<h2 class="section-title">Next up</h2>
+				<p class="muted small">One step per project. Do one, then name the one after.</p>
+			</header>
 
-		<button
-			type="button"
-			class="btn add"
-			onclick={() => (newProjectOpen = true)}
-			data-testid="add-project"
-		>
-			<Icon name="plus" size={16} />
-			Start a project
-			{#if app.wip.headroom > 0}
-				<span class="faint small">{app.wip.headroom} left</span>
+			<ul>
+				{#each nextUp as entry (entry.project.id)}
+					<li class="entry" data-testid="today-entry" data-project-id={entry.project.id}>
+						<p class="eyebrow">{entry.project.title}</p>
+						{#if entry.action}
+							<TaskRow task={entry.action} prominent />
+						{:else}
+							<!--
+								A stalled project is a prompt, not a scold — and the prompt lives here
+								because the moment you notice a project has no next step is the moment
+								to name one, not a screen away.
+							-->
+							<form class="stalled" onsubmit={(event) => setNext(event, entry.project)}>
+								<input
+									class="input"
+									bind:value={drafts[entry.project.id]}
+									placeholder="What is the very next step?"
+									aria-label={`Next action for ${entry.project.title}`}
+									data-testid="today-next-input"
+								/>
+								<button
+									type="submit"
+									class="btn btn-primary"
+									disabled={(drafts[entry.project.id] ?? '').trim() === ''}
+									data-testid="today-next-submit">Set</button
+								>
+							</form>
+						{/if}
+					</li>
+				{/each}
+			</ul>
+
+			{#if doneToday > 0}
+				<p class="small faint done-line" data-testid="today-done-count">
+					{doneToday} finished this week
+				</p>
 			{/if}
-		</button>
+		</section>
 	{/if}
 
-	{#if showParked}
-		<section class="parked">
-			<h2 class="section-title">Parked</h2>
-			<p class="muted small">Waiting, not lost. Nothing here is asking anything of you.</p>
+	{#if comingUp.length > 0}
+		<section class="card coming-up" data-testid="today-coming-up">
+			<header class="section-head row">
+				<h2 class="section-title">Coming up</h2>
+				<a href={resolve('/manifest')} class="small all-dates" data-testid="today-all-dates">
+					All dates
+					{#if laterCount > 0}<span class="faint">· {laterCount} later</span>{/if}
+				</a>
+			</header>
 			<ul>
-				{#each app.parked as project (project.id)}
-					<li>
-						<span>{project.title}</span>
-						<button
-							type="button"
-							class="btn btn-sm"
-							onclick={() => void reactivate(project.id)}
-							data-testid="unpark"
-						>
-							Reactivate
-						</button>
+				{#each comingUp as entry (entry.id)}
+					{@const countdown = app.countdown(entry)}
+					<li class="date-row" data-testid="today-date">
+						<span class="date-title">{entry.title}</span>
+						{#if countdown}
+							<span
+								class="when"
+								class:soon={countdown.tone === 'today' || countdown.tone === 'imminent'}
+							>
+								{countdown.label}
+							</span>
+						{/if}
 					</li>
 				{/each}
 			</ul>
 		</section>
+	{:else if app.fixedDates.length > 0}
+		<p class="muted small quiet-line" data-testid="today-no-dates">
+			Nothing on the <a href={resolve('/manifest')}>dates board</a> for the next two weeks.
+		</p>
 	{/if}
 
-	{#if app.done.length > 0}
-		<section class="parked">
-			<h2 class="section-title">Finished</h2>
-			<ul>
-				{#each app.done as project (project.id)}
-					<li><span class="faint">{project.title}</span></li>
-				{/each}
-			</ul>
-		</section>
+	{#if app.inbox.length > 0}
+		<a href={resolve('/inbox')} class="card line-link" data-testid="today-inbox-line">
+			<Icon name="inbox" size={16} />
+			<span>
+				{app.inbox.length}
+				{app.inbox.length === 1 ? 'thought' : 'thoughts'} waiting to be sorted
+			</span>
+			<span class="chevron"><Icon name="chevron" size={14} /></span>
+		</a>
 	{/if}
 </div>
-
-<NewProjectDialog bind:open={newProjectOpen} onclose={() => (newProjectOpen = false)} />
 
 <style>
 	.page-head {
@@ -164,32 +194,138 @@
 		gap: var(--space-4);
 	}
 
-	.projects {
+	.section-head {
+		margin-bottom: var(--space-2);
+	}
+
+	.section-head.row {
 		display: flex;
-		flex-direction: column;
+		align-items: baseline;
+		justify-content: space-between;
 		gap: var(--space-3);
 	}
 
-	.over-limit {
-		display: flex;
-		align-items: flex-start;
-		gap: var(--space-2);
+	.section-title {
 		font-size: var(--text-sm);
-		color: var(--stone-attention);
-		padding: var(--space-3);
-		border-radius: var(--radius);
-		background: var(--stone-attention-soft);
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		color: var(--stone-text-faint);
+		font-weight: 600;
 	}
 
-	.over-limit :global(svg) {
+	.next-up,
+	.coming-up {
+		padding: var(--space-4);
+	}
+
+	.next-up ul,
+	.coming-up ul {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+	}
+
+	.entry {
+		padding: var(--space-2) 0;
+		border-top: 1px solid var(--stone-border);
+	}
+
+	.entry:first-child {
+		border-top: none;
+	}
+
+	.eyebrow {
+		font-size: var(--text-xs);
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		color: var(--stone-text-faint);
+		font-weight: 600;
+	}
+
+	.stalled {
+		display: flex;
+		gap: var(--space-2);
+		margin-top: var(--space-2);
+	}
+
+	.stalled .input {
+		flex: 1;
+	}
+
+	.done-line {
+		margin-top: var(--space-2);
+	}
+
+	.date-row {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: var(--space-3);
+		padding: var(--space-2) 0;
+		border-top: 1px solid var(--stone-border);
+	}
+
+	.date-row:first-child {
+		border-top: none;
+	}
+
+	.date-title {
+		min-width: 0;
+		overflow-wrap: anywhere;
+	}
+
+	.when {
 		flex-shrink: 0;
-		margin-top: 0.125rem;
+		font-size: var(--text-sm);
+		color: var(--stone-text-muted);
 	}
 
-	.add {
-		align-self: flex-start;
-		border-style: dashed;
+	.when.soon {
+		color: var(--stone-accent-text);
+		font-weight: 500;
+	}
+
+	.all-dates {
 		color: var(--stone-text-muted);
+		text-decoration: none;
+	}
+
+	.all-dates:hover {
+		color: var(--stone-text);
+		text-decoration: underline;
+	}
+
+	.quiet-line {
+		padding-inline: var(--space-1);
+	}
+
+	.quiet-line a {
+		color: inherit;
+	}
+
+	.line-link {
+		display: flex;
+		align-items: center;
+		gap: var(--space-3);
+		padding: var(--space-3) var(--space-4);
+		text-decoration: none;
+		color: var(--stone-text);
+		font-size: var(--text-sm);
+	}
+
+	.line-link:hover {
+		background: var(--stone-sunken);
+	}
+
+	.line-link :global(svg) {
+		color: var(--stone-text-faint);
+		flex-shrink: 0;
+	}
+
+	.line-link .chevron {
+		margin-left: auto;
+		display: grid;
+		place-items: center;
 	}
 
 	.empty {
@@ -204,46 +340,5 @@
 		flex-wrap: wrap;
 		gap: var(--space-2);
 		margin-top: var(--space-1);
-	}
-
-	kbd {
-		font-family: inherit;
-		font-size: var(--text-xs);
-		padding: 0.0625rem 0.3125rem;
-		border-radius: var(--radius-sm);
-		border: 1px solid var(--stone-border-strong);
-		background: var(--stone-sunken);
-	}
-
-	.parked {
-		margin-top: var(--space-4);
-	}
-
-	.section-title {
-		font-size: var(--text-sm);
-		text-transform: uppercase;
-		letter-spacing: 0.06em;
-		color: var(--stone-text-faint);
-		font-weight: 600;
-	}
-
-	.parked ul {
-		list-style: none;
-		margin: var(--space-3) 0 0;
-		padding: 0;
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-2);
-	}
-
-	.parked li {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: var(--space-3);
-		padding: var(--space-2) var(--space-3);
-		border: 1px solid var(--stone-border);
-		border-radius: var(--radius);
-		font-size: var(--text-sm);
 	}
 </style>

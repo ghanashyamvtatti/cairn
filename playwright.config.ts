@@ -16,7 +16,15 @@ export default defineConfig({
 	reporter: process.env.CI ? 'list' : [['list']],
 	use: {
 		baseURL: 'http://localhost:4173',
-		trace: 'on-first-retry'
+		trace: 'on-first-retry',
+		/*
+		 * Sandboxed CI containers ship a pre-installed Chromium and block downloads, so
+		 * they point this at it (e.g. /opt/pw-browsers/chromium). Unset anywhere else,
+		 * which leaves Playwright's own managed browser in charge.
+		 */
+		...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE
+			? { launchOptions: { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE } }
+			: {})
 	},
 	projects: [
 		{

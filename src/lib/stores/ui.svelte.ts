@@ -9,9 +9,10 @@ export interface ShortcutDefinition {
 }
 
 export const SHORTCUTS: readonly ShortcutDefinition[] = [
-	{ keys: 'c', description: 'Capture a thought' },
+	{ keys: 'c', description: 'Jot down a thought' },
+	{ keys: 'g then t', description: 'Go to Today' },
 	{ keys: 'g then p', description: 'Go to projects' },
-	{ keys: 'g then m', description: 'Go to the manifest' },
+	{ keys: 'g then d', description: 'Go to the dates board' },
 	{ keys: 'g then i', description: 'Go to the inbox' },
 	{ keys: 'g then r', description: 'Go to the weekly review' },
 	{ keys: 'g then s', description: 'Go to settings' },
@@ -21,8 +22,11 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
 ] as const;
 
 const GOTO_TARGETS: Record<string, AppRoute> = {
-	p: ROUTES.home,
+	t: ROUTES.home,
 	h: ROUTES.home,
+	p: ROUTES.projects,
+	d: ROUTES.manifest,
+	// `m` predates the "Dates" name; kept so a learned habit does not break.
 	m: ROUTES.manifest,
 	i: ROUTES.inbox,
 	r: ROUTES.review,

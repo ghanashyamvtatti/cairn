@@ -19,9 +19,12 @@ overdue items, feel bad, and stop opening the app. Cairn is built so that cannot
 - **Exactly one next action per project.** A project with none is _stalled_, and the flag
   is an input box, because the only useful response to "this is stalled" is deciding what
   moves it.
-- **Deadlines live somewhere else.** A departure board of dates counting down, entirely
-  separate from tasks. Manifest items cannot be completed — a calendar item is not a
-  to-do, and the schema enforces it.
+- **One screen answers "what now?".** The app opens on Today: one next action per
+  project, tickable in place, plus whatever dates arrive in the next two weeks. The
+  answer is assembled for you instead of being spread across screens.
+- **Deadlines live somewhere else.** The Dates board is a departure board of dates
+  counting down, entirely separate from tasks. Its entries cannot be completed — a
+  calendar item is not a to-do, and the schema enforces it.
 - **Capture first, decide later.** One field, no required fields, under a second. Sorting
   is a different job from thinking of things.
 - **A graceful reset.** Starting a new week files what you finished and carries what you
@@ -32,7 +35,7 @@ scheduling, calendar sync, and per-task notifications.
 
 ## Finding your way in
 
-First run opens a short welcome, and from there you can take a spotlight tour of the four
+First run opens a short welcome, and from there you can take a spotlight tour of the five
 screens, load an example week to poke at, or read [the guide](src/routes/guide) — which is
 also always available from the ⓘ in the header, from the `?` shortcut sheet, or by
 pressing `g` then `?`.

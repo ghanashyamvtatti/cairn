@@ -8,6 +8,7 @@
 	 */
 	export type IconName =
 		| 'cairn'
+		| 'today'
 		| 'projects'
 		| 'manifest'
 		| 'inbox'
@@ -78,6 +79,11 @@
 			fill="currentColor"
 			stroke="none"
 			opacity="0.45"
+		/>
+	{:else if name === 'today'}
+		<circle cx="10" cy="10" r="3.4" />
+		<path
+			d="M10 2.75v1.9M10 15.35v1.9M2.75 10h1.9M15.35 10h1.9M4.9 4.9l1.35 1.35M13.75 13.75l1.35 1.35M15.1 4.9l-1.35 1.35M6.25 13.75L4.9 15.1"
 		/>
 	{:else if name === 'projects'}
 		<rect x="2.75" y="3.75" width="14.5" height="4" rx="1.5" />

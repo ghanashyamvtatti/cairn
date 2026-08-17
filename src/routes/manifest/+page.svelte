@@ -6,7 +6,8 @@
 	import { app } from '$lib/stores/app.svelte';
 
 	/**
-	 * The departure board.
+	 * The dates board. (The route keeps its historical `/manifest` path; every label
+	 * says "Dates" because that is what it holds.)
 	 *
 	 * Deliberately a separate surface from tasks. A deadline is not something you do —
 	 * it is something that arrives whether or not you do anything — and mixing the two
@@ -64,13 +65,16 @@
 </script>
 
 <svelte:head>
-	<title>Manifest · Cairn</title>
+	<title>Dates · Cairn</title>
 </svelte:head>
 
 <header class="page-head">
 	<div>
-		<h1>Manifest</h1>
-		<p class="muted small">Dates that arrive whether or not you are ready. Not a to-do list.</p>
+		<h1>Dates</h1>
+		<p class="muted small">
+			Renewals, flights, birthdays, deadlines — they arrive whether or not you are ready. Not a
+			to-do list.
+		</p>
 	</div>
 </header>
 

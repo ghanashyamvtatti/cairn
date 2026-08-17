@@ -12,8 +12,8 @@
 	/**
 	 * Shown once, on a genuinely empty database.
 	 *
-	 * Cairn's shape is not guessable from an empty screen: four surfaces with unfamiliar
-	 * names and a weekly rhythm connecting them. Rather than explain all of it here, this
+	 * Cairn's shape is not guessable from an empty screen: five surfaces and a weekly
+	 * rhythm connecting them. Rather than explain all of it here, this
 	 * says the least that makes the rest legible and then offers three honest ways in —
 	 * be shown, be given something to look at, or be left alone.
 	 */
@@ -71,11 +71,18 @@
 
 <Dialog bind:open title="Welcome to Cairn" onclose={finish}>
 	<p>
-		Cairn keeps a small number of things moving and stays quiet about the rest. There are four
-		places, and they connect in a loop:
+		Cairn keeps a small number of things moving and stays quiet about the rest. Five places, one job
+		each:
 	</p>
 
 	<ul class="pillars">
+		<li>
+			<Icon name="today" size={16} />
+			<div>
+				<strong>Today</strong> — the answer to “what now?”: one next step per project, plus what is coming
+				up. Most days you only need this.
+			</div>
+		</li>
 		<li>
 			<Icon name="projects" size={16} />
 			<div>
@@ -86,7 +93,7 @@
 		<li>
 			<Icon name="manifest" size={16} />
 			<div>
-				<strong>Manifest</strong> — a board of fixed dates counting down. Not tasks; you cannot tick them
+				<strong>Dates</strong> — a board of fixed dates counting down. Not tasks; you cannot tick them
 				off.
 			</div>
 		</li>

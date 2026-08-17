@@ -80,7 +80,18 @@
 </section>
 
 <section class="card block">
-	<h2>The four places</h2>
+	<h2>The five places</h2>
+
+	<div class="place">
+		<h3><Icon name="today" size={18} /> Today</h3>
+		<p>
+			The screen the app opens on, and the one that answers “what should I do right now?”. It
+			gathers one <strong>next action</strong> from each project you are running — tickable right there
+			— along with any dates arriving in the next two weeks and a pointer to the inbox when something
+			is waiting to be sorted. Ticking off a step asks you to name the next one on the spot, so a project
+			never quietly grinds to a halt.
+		</p>
+	</div>
 
 	<div class="place">
 		<h3><Icon name="projects" size={18} /> Projects</h3>
@@ -99,7 +110,7 @@
 	</div>
 
 	<div class="place">
-		<h3><Icon name="manifest" size={18} /> Manifest</h3>
+		<h3><Icon name="manifest" size={18} /> Dates</h3>
 		<p>
 			A departure board of dates that arrive whether or not you are ready: renewals, flights,
 			deadlines, birthdays. Each shows a live countdown. They are deliberately
@@ -117,8 +128,8 @@
 			the insurance by 30 September” and the date is understood and lifted out for you.
 		</p>
 		<p>
-			Later, sort each item: into a project, as a project's next action, onto the manifest, into a
-			new project, or the bin. Nothing stays in the inbox.
+			Later, sort each item: into a project, as a project's next action, onto the dates board, into
+			a new project, or the bin. Nothing stays in the inbox.
 		</p>
 	</div>
 
@@ -149,8 +160,8 @@
 			<strong>Whenever something occurs to you</strong> — press <kbd>c</kbd>, type it, forget it.
 		</li>
 		<li>
-			<strong>Most days</strong> — open Projects, do the next action on whichever one you have energy
-			for, and pick the next one.
+			<strong>Most days</strong> — open Today, do the next action on whichever project you have energy
+			for, and name the one after.
 		</li>
 		<li>
 			<strong>Once a week</strong> — run the review and start a new week.

@@ -78,7 +78,7 @@
 		// cannot read back. Validate with the same parser the board uses.
 		if (!manifestDate || !parseIsoDate(manifestDate)) return;
 		await app.repository.triageInboxItem(item.id, { kind: 'to-manifest', date: manifestDate });
-		toasts.show('Added to the manifest.');
+		toasts.show('Added to the dates board.');
 	}
 
 	async function toNewProject() {
@@ -191,7 +191,7 @@
 						class="input"
 						type="date"
 						bind:value={manifestDate}
-						aria-label="Date for the manifest"
+						aria-label="Date for the board"
 						data-testid="triage-manifest-date"
 					/>
 					<button type="button" class="btn btn-sm btn-quiet" onclick={setToday}>Today</button>
@@ -202,7 +202,7 @@
 						onclick={toManifest}
 						data-testid="triage-manifest-add"
 					>
-						Add to manifest
+						Add to dates
 					</button>
 					{#if datePreview}
 						<span class="small muted">{datePreview.label}</span>

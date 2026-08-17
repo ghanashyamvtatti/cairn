@@ -2,6 +2,7 @@ import { expect, test, type Browser, type Page } from '@playwright/test';
 import {
 	TEST_PASSWORD,
 	createProject,
+	gotoProjects,
 	projectCard,
 	setNextAction,
 	signUp,
@@ -49,6 +50,7 @@ test.describe('two devices, one account', () => {
 		await setNextAction(a, 'Move the studio', 'Ring three removal firms');
 
 		const b = await joinAs(browser, email);
+		await gotoProjects(b);
 
 		// B never touched this data; it can only be here because it came from the server.
 		const card = projectCard(b, 'Move the studio');
@@ -66,6 +68,7 @@ test.describe('two devices, one account', () => {
 		await createProject(a, 'Fix the roof');
 
 		const b = await joinAs(browser, email);
+		await gotoProjects(b);
 		await setNextAction(b, 'Fix the roof', 'Photograph the flashing');
 
 		await refresh(a);
@@ -84,6 +87,7 @@ test.describe('two devices, one account', () => {
 		await createProject(a, 'Temporary project');
 
 		const b = await joinAs(browser, email);
+		await gotoProjects(b);
 		await expect(projectCard(b, 'Temporary project')).toBeVisible();
 
 		// Delete on A.
@@ -110,6 +114,7 @@ test.describe('two devices, one account', () => {
 		await setNextAction(a, 'Shared project', 'First action');
 
 		const b = await joinAs(browser, email);
+		await gotoProjects(b);
 		await projectCard(b, 'Shared project').getByTestId('project-disclosure').click();
 		await projectCard(b, 'Shared project').getByTestId('add-task-input').fill('Second action');
 		await projectCard(b, 'Shared project')
@@ -168,6 +173,7 @@ test.describe('two devices, one account', () => {
 
 		// ...but signing back in brings it all home.
 		const b = await joinAs(browser, email);
+		await gotoProjects(b);
 		await expect(projectCard(b, 'Still here afterwards')).toBeVisible();
 
 		await a.context().close();
@@ -183,6 +189,7 @@ test.describe('two devices, one account', () => {
 		const b = await openDevice(browser);
 		await signUp(b, uniqueEmail());
 		await b.getByTestId('welcome-skip').click();
+		await gotoProjects(b);
 
 		await expect(b.getByTestId('empty-projects')).toBeVisible();
 		await expect(projectCard(b, 'Private to the first account')).toHaveCount(0);

@@ -34,25 +34,25 @@ export const REVIEW_STEPS: readonly ReviewStep[] = [
 	{
 		id: 'sort-inbox',
 		title: 'Sort the inbox',
-		hint: 'Every item goes to a project, to the manifest, or in the bin. Nothing stays.',
+		hint: 'Every item goes to a project, to the dates board, or in the bin. Nothing stays.',
 		href: '/inbox',
-		cta: 'Triage items',
+		cta: 'Sort items',
 		minutes: 5
 	},
 	{
 		id: 'pick-next-actions',
 		title: 'Pick one next action per project',
 		hint: 'One concrete, physical thing you could start. A project without one cannot move.',
-		href: '/',
+		href: '/projects',
 		cta: 'Review projects',
 		minutes: 3
 	},
 	{
 		id: 'scan-manifest',
-		title: 'Scan the deadlines',
+		title: 'Scan the dates',
 		hint: 'Look at what is coming. You are only checking nothing has crept up on you.',
 		href: '/manifest',
-		cta: 'Open the manifest',
+		cta: 'Open the board',
 		minutes: 2
 	}
 ] as const;

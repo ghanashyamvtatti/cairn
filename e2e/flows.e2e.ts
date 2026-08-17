@@ -55,7 +55,7 @@ test.describe('capture and triage', () => {
 		await expect(page.getByTestId('triage-manifest-date')).toHaveValue(localIsoDate(1));
 		await page.getByTestId('triage-manifest-add').click();
 
-		await page.getByTestId('nav-manifest').first().click();
+		await page.getByTestId('nav-dates').first().click();
 		const row = page.getByTestId('manifest-row');
 		await expect(row).toContainText('Renew the studio insurance');
 		await expect(row).toContainText('Tomorrow');
@@ -129,9 +129,64 @@ test.describe('one next action per project', () => {
 	});
 });
 
-test.describe('the manifest', () => {
+test.describe('the today view', () => {
+	test('assembles one next step per project, tickable in place', async ({ page }) => {
+		await createProject(page, 'Move the studio');
+		await setNextAction(page, 'Move the studio', 'Ring three removal firms');
+
+		await page.getByTestId('nav-today').first().click();
+		const entry = page.getByTestId('today-entry').filter({ hasText: 'Move the studio' });
+		await expect(entry).toContainText('Ring three removal firms');
+
+		await entry.getByTestId('task-complete').check();
+
+		// The finished step swaps for a prompt in place: naming the next step happens at
+		// the moment of momentum, not behind a card on another screen.
+		await expect(entry.getByTestId('today-next-input')).toBeVisible();
+		await entry.getByTestId('today-next-input').fill('Book the van');
+		await entry.getByTestId('today-next-submit').click();
+		await expect(entry).toContainText('Book the van');
+
+		const { tasks } = await readDb(page);
+		expect(tasks.filter((t) => t.isNextAction === true)).toHaveLength(1);
+	});
+
+	test('shows only the dates near enough to matter, with the rest one tap away', async ({
+		page
+	}) => {
+		await page.getByTestId('nav-dates').first().click();
+		await page.getByTestId('manifest-title').fill('Filing deadline');
+		await page.getByTestId('manifest-date').fill(localIsoDate(3));
+		await page.getByTestId('manifest-add').click();
+		// Wait for the form to clear itself, not merely for the row to appear: the row
+		// renders off the live snapshot, which can emit before the add's promise resolves
+		// — and its resolution is what clears the fields, wiping a second entry typed in
+		// too early.
+		await expect(page.getByTestId('manifest-title')).toHaveValue('');
+		await expect(page.getByTestId('manifest-row')).toHaveCount(1);
+		await page.getByTestId('manifest-title').fill('Passport renewal');
+		await page.getByTestId('manifest-date').fill(localIsoDate(60));
+		await page.getByTestId('manifest-add').click();
+		await expect(page.getByTestId('manifest-row')).toHaveCount(2);
+
+		await page.getByTestId('nav-today').first().click();
+		const board = page.getByTestId('today-coming-up');
+		await expect(board).toContainText('Filing deadline');
+		await expect(board).not.toContainText('Passport renewal');
+		await expect(page.getByTestId('today-all-dates')).toContainText('1 later');
+	});
+
+	test('points at the inbox when thoughts are waiting to be sorted', async ({ page }) => {
+		await capture(page, 'A loose thought');
+
+		await page.getByTestId('nav-today').first().click();
+		await expect(page.getByTestId('today-inbox-line')).toContainText('1 thought waiting');
+	});
+});
+
+test.describe('the dates board', () => {
 	test('shows a live countdown and refuses to let a date be completed', async ({ page }) => {
-		await page.getByTestId('nav-manifest').first().click();
+		await page.getByTestId('nav-dates').first().click();
 
 		await page.getByTestId('manifest-title').fill('Passport expires');
 		await page.getByTestId('manifest-date').fill(localIsoDate(12));
@@ -144,7 +199,7 @@ test.describe('the manifest', () => {
 	});
 
 	test('today reads as Today, not as one day away or as passed', async ({ page }) => {
-		await page.getByTestId('nav-manifest').first().click();
+		await page.getByTestId('nav-dates').first().click();
 		await page.getByTestId('manifest-title').fill('Filing deadline');
 		await page.getByTestId('manifest-date').fill(localIsoDate(0));
 		await page.getByTestId('manifest-add').click();
@@ -154,7 +209,7 @@ test.describe('the manifest', () => {
 	});
 
 	test('past dates move to a collapsed section rather than a pile of red', async ({ page }) => {
-		await page.getByTestId('nav-manifest').first().click();
+		await page.getByTestId('nav-dates').first().click();
 		await page.getByTestId('manifest-title').fill('Something that already happened');
 		await page.getByTestId('manifest-date').fill(localIsoDate(-3));
 		await page.getByTestId('manifest-add').click();
@@ -278,7 +333,7 @@ test.describe('export and import', () => {
 		await setNextAction(page, 'Move the studio', 'Ring three removal firms');
 		await capture(page, 'A loose thought');
 
-		await page.getByTestId('nav-manifest').first().click();
+		await page.getByTestId('nav-dates').first().click();
 		await page.getByTestId('manifest-title').fill('Passport expires');
 		await page.getByTestId('manifest-date').fill(localIsoDate(30));
 		await page.getByTestId('manifest-add').click();
@@ -307,7 +362,7 @@ test.describe('export and import', () => {
 		const card = projectCard(page, 'Move the studio');
 		await expect(card.getByTestId('next-action')).toContainText('Ring three removal firms');
 
-		await page.getByTestId('nav-manifest').first().click();
+		await page.getByTestId('nav-dates').first().click();
 		await expect(page.getByTestId('manifest-row')).toContainText('Passport expires');
 
 		await page.getByTestId('nav-inbox').first().click();
@@ -338,7 +393,7 @@ test.describe('offline and installability', () => {
 		});
 
 		await context.setOffline(true);
-		for (const path of ['/', '/manifest', '/inbox', '/review', '/settings']) {
+		for (const path of ['/', '/projects', '/manifest', '/inbox', '/review', '/settings']) {
 			await page.goto(path);
 			await expect(page.getByRole('link', { name: 'Cairn, home' })).toBeVisible();
 		}
@@ -368,10 +423,10 @@ test.describe('offline and installability', () => {
 
 test.describe('keyboard and accessibility', () => {
 	test('opens capture from anywhere with a single keystroke', async ({ page }) => {
-		await page.getByTestId('nav-manifest').first().click();
+		await page.getByTestId('nav-dates').first().click();
 		// Click the heading, not `body`: a `body` click targets its centre, which lands on
 		// a real button on some screens and activates it.
-		await page.getByRole('heading', { name: 'Manifest' }).click();
+		await page.getByRole('heading', { name: 'Dates' }).click();
 		await page.keyboard.press('c');
 
 		const dialog = page.locator('dialog[open]');
@@ -398,7 +453,7 @@ test.describe('keyboard and accessibility', () => {
 	});
 
 	test('navigates with the g chord', async ({ page }) => {
-		await page.getByRole('heading', { name: 'This week' }).click();
+		await page.getByRole('heading', { name: 'Today' }).click();
 		expect(await page.evaluate(() => document.activeElement?.tagName)).toBe('BODY');
 
 		// Two ordinary presses. The 1.5s chord window is generous even under load once
@@ -641,7 +696,7 @@ test.describe('regressions', () => {
 	test('the manifest edit dialog explains itself instead of a dead Save button', async ({
 		page
 	}) => {
-		await page.getByTestId('nav-manifest').first().click();
+		await page.getByTestId('nav-dates').first().click();
 		await page.getByTestId('manifest-title').fill('Passport expires');
 		await page.getByTestId('manifest-date').fill(localIsoDate(20));
 		await page.getByTestId('manifest-add').click();
@@ -677,11 +732,11 @@ test.describe('onboarding', () => {
 		await resetApp(page, { keepWelcome: true });
 	});
 
-	test('greets a first-time user and explains what the four places are', async ({ page }) => {
+	test('greets a first-time user and explains what the five places are', async ({ page }) => {
 		const welcome = page.locator('dialog[open]');
 		await expect(welcome).toBeVisible();
 		await expect(welcome).toContainText('Welcome to Cairn');
-		for (const place of ['Projects', 'Manifest', 'Inbox', 'Review']) {
+		for (const place of ['Today', 'Projects', 'Dates', 'Inbox', 'Review']) {
 			await expect(welcome).toContainText(place);
 		}
 	});
@@ -691,7 +746,7 @@ test.describe('onboarding', () => {
 		await expect(page.locator('dialog[open]')).toHaveCount(0);
 
 		await page.reload();
-		await expect(page.getByRole('heading', { name: 'This week' })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Today' })).toBeVisible();
 		await expect(page.locator('dialog[open]')).toHaveCount(0);
 	});
 
@@ -700,16 +755,18 @@ test.describe('onboarding', () => {
 		await page.locator('dialog[open]').getByTestId('welcome-tour').click();
 
 		const card = page.getByTestId('tour-card');
-		await expect(card).toContainText('Three projects, and no more');
-		await expect(page.getByTestId('project-card')).toHaveCount(3);
+		await expect(card).toContainText('Open the app, get an answer');
+		// The example's three projects each surface a Next-up entry on Today.
+		await expect(page.getByTestId('today-entry')).toHaveCount(3);
 
 		// Each step must land on its own surface before being counted, or this races the
 		// navigation the tour performs between steps.
 		const expected = [
 			'/',
 			'/',
-			'/',
 			'/inbox',
+			'/projects',
+			'/projects',
 			'/manifest',
 			'/review',
 			'/review',
@@ -752,7 +809,7 @@ test.describe('onboarding', () => {
 
 	test('the example week is a legal board, not hand-crafted state', async ({ page }) => {
 		await page.locator('dialog[open]').getByTestId('welcome-tour').click();
-		await expect(page.getByTestId('project-card')).toHaveCount(3);
+		await expect(page.getByTestId('today-entry')).toHaveCount(3);
 		await page.getByTestId('tour-skip').click();
 
 		const { projects, tasks, fixedDates, inboxItems, weeks } = await readDb(page);
@@ -776,7 +833,7 @@ test.describe('onboarding', () => {
 
 		const { projects, tasks, fixedDates, inboxItems } = await readDb(page);
 		expect([...projects, ...tasks, ...fixedDates, ...inboxItems]).toHaveLength(0);
-		await expect(page.getByTestId('empty-projects')).toBeVisible();
+		await expect(page.getByTestId('today-empty')).toBeVisible();
 	});
 
 	test('the guide is reachable from the header and explains the vocabulary', async ({ page }) => {
@@ -785,7 +842,7 @@ test.describe('onboarding', () => {
 
 		await expect(page.getByRole('heading', { name: 'How Cairn works' })).toBeVisible();
 		// The words the interface uses, defined where someone can find them.
-		for (const term of ['next action', 'stalled', 'park', 'Manifest']) {
+		for (const term of ['next action', 'stalled', 'park', 'Dates', 'Today']) {
 			await expect(page.locator('main')).toContainText(term);
 		}
 		await expect(page.locator('main')).toContainText('Home Screen');

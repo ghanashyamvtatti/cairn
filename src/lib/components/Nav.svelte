@@ -14,15 +14,18 @@
 	}
 
 	/**
-	 * Counts appear only for the inbox and only when there is something in it.
+	 * Five places, each answering one question: Today (what now?), Projects (what am I
+	 * moving?), Dates (what arrives?), Inbox (what did I jot down?), Review (weekly
+	 * reset). Counts appear only for the inbox and only when there is something in it.
 	 *
 	 * There is deliberately no badge for overdue anything. A permanent red number is the
 	 * mechanic that turns one missed week into a deleted app, and the product's whole
 	 * position is the opposite of that.
 	 */
 	let items = $derived<NavItem[]>([
-		{ href: '/', label: 'Projects', icon: 'projects' },
-		{ href: '/manifest', label: 'Manifest', icon: 'manifest' },
+		{ href: '/', label: 'Today', icon: 'today' },
+		{ href: '/projects', label: 'Projects', icon: 'projects' },
+		{ href: '/manifest', label: 'Dates', icon: 'manifest' },
 		{ href: '/inbox', label: 'Inbox', icon: 'inbox', count: app.inbox.length },
 		{ href: '/review', label: 'Review', icon: 'review' }
 	]);
